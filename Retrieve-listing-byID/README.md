@@ -98,7 +98,7 @@ const response = await fetch(
 3. **Invoke the Function**
    Use `curl` or any HTTP client to call the function:
    ```bash
-   curl -i --location --request POST 'http://127.0.0.1:54321/functions/v1/Retrieve-listing-byID' \
+   curl -i --location --request POST 'https://oaumvyuwtzuyhkwzzxtb.supabase.co/functions/v1/Retrieve-listing-byID' \
      --header 'Authorization: Bearer YOUR_SUPABASE_ANON_KEY' \
      --header 'Content-Type: application/json' \
      --data '{"id":"LISTING_ID"}'
