@@ -61,8 +61,4 @@ The function requires the following environment variables to be set in your Supa
       "access_token": "your-access-token"
     }
   }
-Error:
-{
-  "status": "error",
-  "message": "Error message"
-}
+**Error**:{  "status": "error",  "message": "Error message"}
