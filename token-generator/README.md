@@ -1,19 +1,17 @@
-# Londoners Edge Functions
+# Token Generator Edge Function
 
-This repository contains the **Supabase Edge Function** for generating and managing Guesty API tokens.
+This edge function is responsible for generating and managing Guesty API tokens. It ensures that a valid token is always available by checking the database for an existing token and generating a new one if necessary.
 
 ## Overview
 
-The edge function:
-1. Generates a new token from the Guesty API.
-2. Stores the token in a Supabase database.
-3. Checks if a valid token exists and reuses it if possible.
-4. Automatically generates a new token if the current one is expired or about to expire.
+The function performs the following tasks:
+1. Checks if a valid token exists in the `guesty_tokens` table.
+2. If no valid token is found or the token is about to expire, it generates a new token using the Guesty API.
+3. Stores the newly generated token in the `guesty_tokens` table in the Supabase database.
 
 ## File Structure
 
 - `index.ts`: The main edge function file.
-- `README.md`: Documentation for the edge function.
 
 ## Environment Variables
 
@@ -28,20 +26,43 @@ The function requires the following environment variables to be set in your Supa
 
 ## How It Works
 
-1. **Token Generation**:
-   - The function sends a POST request to the Guesty API with the required credentials.
-   - The API responds with an access token and expiration details.
+1. **Token Validation**:
+   - The function checks the `guesty_tokens` table for the most recent token.
+   - If the token is valid and not about to expire (within 5 minutes), it is reused.
 
-2. **Database Storage**:
-   - The token is stored in the `guesty_tokens` table in the Supabase database.
-   - A database trigger calculates the `expires_at` timestamp.
+2. **Token Generation**:
+   - If no valid token exists, the function sends a POST request to the Guesty API to generate a new token.
+   - The token is stored in the `guesty_tokens` table, and the `expires_at` timestamp is calculated automatically by the database.
 
-3. **Token Validation**:
-   - The function checks if a valid token exists in the database.
-   - If no valid token exists, a new one is generated.
+3. **Response**:
+   - The function returns the token details, including the `access_token`, `expires_in`, `expires_at`, and `scope`.
 
-## Deployment
+## API Endpoints
 
-1. Deploy the edge function to your Supabase project:
-   ```bash
-   supabase functions deploy token-generator
+### POST `https://oaumvyuwtzuyhkwzzxtb.supabase.co/functions/v1/token-generator`
+
+#### Request
+- **Method**: `POST`
+- **Headers**:
+  - `Content-Type: application/json`
+- **Body**: None required.
+
+#### Response
+- **Success**:
+  ```json
+  {
+    "status": "success",
+    "message": "Token retrieved successfully",
+    "data": {
+      "token_type": "Bearer",
+      "expires_in": 3600,
+      "scope": "open-api",
+      "expires_at": "2023-12-31T23:59:59.000Z",
+      "access_token": "your-access-token"
+    }
+  }
+Error:
+{
+  "status": "error",
+  "message": "Error message"
+}
