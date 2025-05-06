@@ -1,12 +1,13 @@
 # Auth Login Edge Function Documentation
 
-This Edge Function handles user login by authenticating with Supabase Auth using the provided email and password. It returns a success response with the session and user data upon successful authentication.
+This Edge Function handles user login by authenticating with Supabase Auth using provided email and password. It optionally supports redirecting the user to a specified URL after successful login.
 
 ---
 
 ## Features
 
-- **Supabase Integration**: Authenticates users using Supabase Auth with email and password.
+- **Supabase Integration**: Authenticates users with Supabase Auth using email and password.
+- **Redirect Support**: Optionally redirects users to a specified URL after successful login.
 - **CORS Support**: Fully handles CORS preflight requests.
 - **Error Handling**: Provides detailed error messages for input validation and authentication failures.
 
@@ -58,7 +59,8 @@ No body or additional headers required.
 ```json
 {
   "email": "user@example.com",
-  "password": "securepassword"
+  "password": "securepassword",
+  "redirect_to": "https://example.com/dashboard"
 }
 ```
 
@@ -66,7 +68,35 @@ No body or additional headers required.
 
 ## Response Structure
 
-### Success Response
+### Success Response (With Redirect)
+**Status Code**: `200`  
+**Headers**:
+- `Location`: URL specified in `redirect_to`
+  
+**Body**:
+```json
+{
+  "status": "success",
+  "message": "Login successful, redirecting...",
+  "session": {
+    "access_token": "access_token_here",
+    "expires_in": 3600,
+    "refresh_token": "refresh_token_here",
+    "token_type": "bearer",
+    "user": {
+      "id": "user_id_here",
+      "email": "user@example.com"
+    }
+  },
+  "user": {
+    "id": "user_id_here",
+    "email": "user@example.com",
+    "role": "authenticated"
+  }
+}
+```
+
+### Success Response (Without Redirect)
 **Status Code**: `200`  
 **Body**:
 ```json
@@ -112,7 +142,7 @@ No body or additional headers required.
 ```
 
 **Status Code**: `500` (Internal Server Error)  
-**Body**:
+**Body** (for unexpected errors):
 ```json
 {
   "status": "error",
@@ -129,7 +159,7 @@ You can invoke this Edge Function from a Next.js application using the `fetch` A
 ### Example Code
 
 ```typescript name=call-auth-Login.ts
-export async function loginUser(email, password) {
+export async function loginUser(email, password, redirectTo) {
   const apiUrl = `${process.env.NEXT_PUBLIC_SUPABASE_API_URL}/functions/v1/auth-Login`;
   const token = process.env.SUPABASE_FUNCTION_TOKEN;
 
@@ -140,7 +170,7 @@ export async function loginUser(email, password) {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, redirect_to: redirectTo }),
     });
 
     if (!response.ok) {
@@ -179,6 +209,7 @@ export async function loginUser(email, password) {
      const [credentials, setCredentials] = useState({
        email: "",
        password: "",
+       redirect_to: "https://example.com/dashboard"
      });
 
      const [response, setResponse] = useState(null);
@@ -186,7 +217,7 @@ export async function loginUser(email, password) {
 
      async function handleLogin() {
        try {
-         const result = await loginUser(credentials.email, credentials.password);
+         const result = await loginUser(credentials.email, credentials.password, credentials.redirect_to);
          setResponse(result);
        } catch (err) {
          setError(err.message);
@@ -196,7 +227,6 @@ export async function loginUser(email, password) {
      return (
        <div>
          <h1>Login</h1>
-         {/* Add form inputs for email and password */}
          <input
            type="email"
            placeholder="Email"
@@ -229,7 +259,6 @@ export async function loginUser(email, password) {
 
 ## Additional Notes
 
-- Ensure your Supabase project is configured with the required authentication settings.
+- Ensure your Supabase project is properly configured for authentication.
 - Handle sensitive credentials securely and never expose them in client-side code.
-- Provide proper error handling for production-grade implementations.
-- 
+- Optionally, implement additional security measures for validating `redirect_to` URLs.
