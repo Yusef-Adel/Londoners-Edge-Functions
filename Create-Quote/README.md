@@ -1,70 +1,90 @@
-# Create-Quote Function Documentation
+# Create Quote Edge Function Documentation
 
-## Overview
-
-The `Create-Quote` function is a Deno edge function that integrates with the Supabase and Guesty APIs to create a quote for a property listing. It performs the following tasks:
-
-1. Validates the incoming HTTP POST request.
-2. Retrieves an authorization token from the Supabase database.
-3. Sends a quote creation request to the Guesty API.
-4. Stores the quote details in the Supabase database.
-5. Returns the created quote details along with the Guesty API response.
-
-This function is designed to handle quote creation for vacation rental listings.
+This Edge Function creates a quote for a listing by integrating with the Guesty API. It validates the input, sends the request to Guesty, and stores the resulting quote in the Supabase database.
 
 ---
 
-## Endpoints
+## Features
 
-### Function URL
-`https://oaumvyuwtzuyhkwzzxtb.supabase.co/functions/v1/Create-Quote`
-
----
-
-## Method
-
-- **POST**: This function only supports POST requests.
+- **Supabase Integration**: Retrieves the Guesty API token and stores the created quote in the `quotes` table.
+- **Guesty API Integration**: Sends a quote request to the Guesty API and retrieves the response.
+- **Validation**: Ensures all required fields are present and validates the input data.
+- **CORS Support**: Fully handles CORS preflight requests.
+- **Error Handling**: Provides detailed error messages for validation, API failures, and database issues.
 
 ---
 
-## Request Headers
+## How to Deploy
 
-- **Authorization**: A `Bearer` token is required in the `Authorization` header. This token should be your Supabase anonymous key or a valid token.
+1. **Set up Supabase Edge Functions**:
+   - Follow the [Supabase Edge Functions documentation](https://supabase.com/docs/guides/functions) to deploy this function.
+   - Ensure the environment variables `SUPABASE_URL` and `SUPABASE_ANON_KEY` are configured in your Supabase project.
 
-- **Content-Type**: Must be set to `application/json`.
+2. **Environment Variables**:
+   - `SUPABASE_URL`: Your Supabase project URL.
+   - `SUPABASE_ANON_KEY`: Your Supabase Anonymous Key.
 
----
-
-## Request Body
-
-The request body should be a JSON object with the following fields:
-
-### Required Fields
-- `check_in_date_localized` (string): The check-in date in a localized format (e.g., `2025-06-01`).
-- `check_out_date_localized` (string): The check-out date in a localized format (e.g., `2025-06-07`).
-- `listing_id` (string): The ID of the property listing.
-- `source` (string): The source of the booking (e.g., `website`).
-- `guests_count` (number): The number of guests (must be at least 1).
-
-### Optional Fields
-- `ignore_calendar` (boolean): Whether to ignore calendar availability. Default is `false`.
-- `ignore_terms` (boolean): Whether to ignore terms and conditions. Default is `false`.
-- `ignore_blocks` (boolean): Whether to ignore blocked dates. Default is `false`.
-- `coupon_code` (string): A coupon code for discounts. Default is `null`.
+3. **Deploy the Function**:
+   - Save the code in a file named `Create-Quote.ts`.
+   - Deploy using the Supabase CLI:
+     ```bash
+     supabase functions deploy Create-Quote
+     ```
 
 ---
 
-## Response
+## API Endpoint
 
-The function returns a JSON object with the following structure:
+Once deployed, the function can be accessed via the following endpoint:
+```
+POST {SUPABASE_API_URL}/functions/v1/Create-Quote
+```
+
+Replace `{SUPABASE_API_URL}` with your Supabase project's API URL.
+
+---
+
+## Request Structure
+
+### CORS Preflight Request
+**Method**: `OPTIONS`  
+No body or additional headers required.
+
+### Create Quote Request
+**Method**: `POST`  
+**Headers**:
+- `Authorization`: Bearer token with appropriate access permissions.
+- `Content-Type`: `application/json`
+
+**Body**:
+```json
+{
+  "check_in_date_localized": "2025-06-01",
+  "check_out_date_localized": "2025-06-07",
+  "listing_id": "abc123",
+  "source": "website",
+  "guests_count": 2,
+  "ignore_calendar": false,
+  "ignore_terms": false,
+  "ignore_blocks": false,
+  "coupon_code": "SUMMER10"
+}
+```
+
+---
+
+## Response Structure
 
 ### Success Response
+**Status Code**: `200`  
+**Body**:
 ```json
 {
   "success": true,
-  "quote_id": "quote_id_in_database",
+  "quote_id": "supabase_quote_id",
   "guesty_quote": {
     "id": "guesty_quote_id",
+    "_id": "guesty_quote_id",
     "pricing": {
       "total": 1000,
       "currency": "USD"
@@ -79,121 +99,143 @@ The function returns a JSON object with the following structure:
     "ignore_calendar": false,
     "ignore_terms": false,
     "ignore_blocks": false,
-    "coupon_code": "SUMMER10"
+    "coupon_code": "SUMMER10",
+    "guesty_quote_id": "guesty_quote_id"
   }
 }
 ```
 
-### Error Response
-The function returns appropriate error messages when validation or processing fails. Example:
+### Error Responses
 
+**Status Code**: `400` (Bad Request)  
+**Body** (for missing required fields):
 ```json
 {
-  "error": "Missing required field: guests_count"
+  "error": "Missing required field: field_name"
+}
+```
+
+**Status Code**: `401` (Unauthorized)  
+**Body** (for missing authorization header):
+```json
+{
+  "error": "Missing authorization header"
+}
+```
+
+**Status Code**: `500` (Internal Server Error)  
+**Body** (for unexpected errors):
+```json
+{
+  "error": "An unexpected error occurred",
+  "details": "Detailed error message"
 }
 ```
 
 ---
 
-## Validation
+## How to Call This Function in a Next.js Application
 
-### Request Method
-Only POST requests are allowed. Requests using other methods will return:
+You can invoke this Edge Function from a Next.js application using the `fetch` API.
 
-```json
-{
-  "error": "Method not allowed"
-}
-```
+### Example Code
 
-### Required Fields
-The function validates that all required fields are provided. Missing fields will result in:
+```typescript name=call-create-quote.ts
+export async function createQuote(quoteDetails) {
+  const apiUrl = `${process.env.NEXT_PUBLIC_SUPABASE_API_URL}/functions/v1/Create-Quote`;
+  const token = process.env.SUPABASE_FUNCTION_TOKEN;
 
-```json
-{
-  "error": "Missing required field: <field_name>"
-}
-```
+  try {
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(quoteDetails),
+    });
 
-### Date Validation
-- Check-in date must be before the check-out date.
-- Dates must be in a valid format.
-- Example error:
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Failed to create quote");
+    }
 
-```json
-{
-  "error": "Check-in date must be before check-out date"
-}
-```
-
-### Guests Count
-The number of guests must be at least 1. Invalid values will result in:
-
-```json
-{
-  "error": "guests_count must be at least 1"
+    const data = await response.json();
+    return data; // The full response from the Edge Function
+  } catch (error) {
+    console.error("Error creating quote:", error.message);
+    throw error;
+  }
 }
 ```
 
 ---
 
-## Curl Command to Test the Function
+## Steps to Integrate
 
-Use the following `curl` command to test the function:
+1. **Set Up Environment Variables**:
+   - Add the following to your `.env.local` file:
+     ```env
+     NEXT_PUBLIC_SUPABASE_API_URL=https://your-supabase-url.supabase.co
+     SUPABASE_FUNCTION_TOKEN=your-function-access-token
+     ```
 
-```bash
-curl -i --location --request POST 'https://oaumvyuwtzuyhkwzzxtb.supabase.co/functions/v1/Create-Quote' \
---header 'Authorization: Bearer YOUR_SUPABASE_ANON_KEY' \
---header 'Content-Type: application/json' \
---data-raw '{
-  "check_in_date_localized": "2025-06-01",
-  "check_out_date_localized": "2025-06-07",
-  "listing_id": "abc123",
-  "source": "website",
-  "guests_count": 2,
-  "ignore_calendar": false,
-  "ignore_terms": false,
-  "ignore_blocks": false,
-  "coupon_code": "SUMMER10"
-}'
-```
+2. **Import the Function**:
+   Import and use the `createQuote` function in your Next.js components or pages.
 
-Replace `YOUR_SUPABASE_ANON_KEY` with your actual Supabase anonymous key.
+   ```typescript name=CreateQuotePage.tsx
+   import { useState } from "react";
+   import { createQuote } from "./call-create-quote";
+
+   export default function CreateQuotePage() {
+     const [quoteDetails, setQuoteDetails] = useState({
+       check_in_date_localized: "",
+       check_out_date_localized: "",
+       listing_id: "",
+       source: "",
+       guests_count: 1,
+       ignore_calendar: false,
+       ignore_terms: false,
+       ignore_blocks: false,
+       coupon_code: "",
+     });
+
+     const [response, setResponse] = useState(null);
+     const [error, setError] = useState(null);
+
+     async function handleCreateQuote() {
+       try {
+         const result = await createQuote(quoteDetails);
+         setResponse(result);
+       } catch (err) {
+         setError(err.message);
+       }
+     }
+
+     return (
+       <div>
+         <h1>Create Quote</h1>
+         {/* Add form inputs for quoteDetails */}
+         <button onClick={handleCreateQuote}>Create Quote</button>
+         {error && <div>Error: {error}</div>}
+         {response && <div>Success: {JSON.stringify(response)}</div>}
+       </div>
+     );
+   }
+   ```
+
+3. **Run the Application**:
+   - Start your Next.js development server:
+     ```bash
+     npm run dev
+     ```
+
+   - Navigate to the Create Quote page to test the integration.
 
 ---
 
-## Error Logging
+## Additional Notes
 
-The function logs errors using `console.error` for debugging purposes. Common errors include:
-- Missing authorization headers.
-- Invalid or missing required fields.
-- Issues communicating with the Guesty API.
-- Database errors when retrieving tokens or storing quotes.
-
----
-
-## Environment Variables
-
-The function relies on the following environment variables:
-- `SUPABASE_URL`: The Supabase project URL.
-- `SUPABASE_ANON_KEY`: The Supabase anonymous key for API interaction.
-
-Ensure these variables are set in your environment before deploying or running the function.
-
----
-
-## Local Testing
-
-To test the function locally:
-1. Start Supabase locally using the CLI: `supabase start`.
-2. Execute the provided curl command with your local function URL (e.g., `http://localhost:54321/functions/v1/Create-Quote`).
-
----
-
-## Dependencies
-
-- **Deno Standard Library**: Used for the HTTP server.
-- **Supabase JavaScript Client**: Used to interact with the Supabase database.
-- **Guesty API**: External API for creating quotes.
-
----
+- Ensure your Supabase project is configured with the required `guesty_tokens` and `quotes` tables.
+- Handle sensitive credentials securely and never expose them in client-side code.
+- Validate input carefully to avoid invalid Guesty API requests.
