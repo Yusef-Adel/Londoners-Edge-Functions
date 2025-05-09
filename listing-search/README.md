@@ -56,7 +56,7 @@ This Edge Function allows you to search Guesty listings using various filters vi
 #### Request
 
 ```bash
-curl -i --location --request GET 'http://127.0.0.1:54321/functions/v1/listing-search?q=beach&limit=10&t.city=Los%20Angeles&active=true&available={"checkIn":"2023-06-01","checkOut":"2023-06-10"}'
+curl -i --location --request GET 'https://oaumvyuwtzuyhkwzzxtb.supabase.co/functions/v1/listing-search?q=beach&limit=10&t.city=Los%20Angeles&active=true&available={"checkIn":"2023-06-01","checkOut":"2023-06-10"}'
 ```
 
 #### Response
@@ -96,7 +96,7 @@ curl -i --location --request GET 'http://127.0.0.1:54321/functions/v1/listing-se
 
 ```javascript name=pages/api/listings.js
 export default async function handler(req, res) {
-  const baseUrl = "http://127.0.0.1:54321/functions/v1/listing-search";
+  const baseUrl = "https://oaumvyuwtzuyhkwzzxtb.supabase.co/functions/v1/listing-search";
 
   try {
     const queryParams = new URLSearchParams({
