@@ -1,174 +1,197 @@
-# Create Reservation Edge Function
+# `create-reservation` Edge Function
 
-This document describes the `create-reservation` edge function, which integrates with Guesty and Supabase to create and manage reservations.
+This edge function creates a reservation in Guesty from a quote, handling both new and existing guests. It is designed to be deployed in a Deno-compatible environment (such as [Supabase Edge Functions](https://supabase.com/docs/guides/functions)) and communicates with both Supabase (for token management) and the Guesty API.
 
-## Overview
+---
 
-The `create-reservation` function is a Deno-based serverless function deployed on Supabase. It performs the following actions:
+## Features
 
-1. Validates incoming POST requests.
-2. Authenticates using a Supabase token.
-3. Creates a quote via the Guesty API.
-4. Creates a reservation based on the quote.
-5. Updates the reservation status to "awaiting_payment."
-6. Stores the reservation in the Supabase database.
+- **Validates incoming reservation requests**: Ensures required fields are present and properly formatted.
+- **Handles both new and existing guests**: Accepts either a `guestId` (for existing guests) or a `guest` object (for new guests).
+- **Integrates with Supabase**: Fetches the Guesty API token from your Supabase database table (`guesty_tokens`).
+- **Creates confirmed reservations in Guesty**: Forwards reservation data to Guesty with a status of `confirmed`.
+- **Comprehensive error handling**: Returns clear JSON error messages for common failure modes.
+- **CORS, Auth, and method safety**: Only allows POST requests and requires an Authorization header.
+
+---
 
 ## API Endpoint
 
-The function is deployed at:
-
 ```
-https://oaumvyuwtzuyhkwzzxtb.supabase.co/functions/v1/create-reservation
+POST /functions/v1/create-reservation
 ```
 
-## Request
+---
 
-### HTTP Method
-- **POST**
+### Required Headers
 
-### Headers
-- `Authorization`: Bearer token (e.g., Supabase service role key).
+| Header            | Value                                 |
+|-------------------|---------------------------------------|
+| Authorization     | Bearer {YOUR_SUPABASE_ANON_KEY or JWT}|
+| Content-Type      | application/json                      |
+
+---
 
 ### Request Body
-The request body should be a JSON object with the following fields:
 
-| Field                    | Type      | Required | Description                                   |
-|--------------------------|-----------|----------|-----------------------------------------------|
-| `check_in_date_localized`| `string`  | Yes      | Check-in date in `YYYY-MM-DD` format.         |
-| `check_out_date_localized`| `string` | Yes      | Check-out date in `YYYY-MM-DD` format.        |
-| `listing_id`             | `string`  | Yes      | The ID of the listing.                        |
-| `source`                 | `string`  | Yes      | Source of the reservation (e.g., "website").  |
-| `guests_count`           | `number`  | Yes      | Total number of guests.                       |
-| `guest_id`               | `string`  | Yes      | Guest ID for the reservation.                 |
-| `number_of_adults`       | `number`  | Yes      | Number of adult guests.                       |
-| `number_of_children`     | `number`  | No       | Number of children.                           |
-| `number_of_infants`      | `number`  | No       | Number of infants.                            |
-| `number_of_pets`         | `number`  | No       | Number of pets.                               |
-| `ignore_calendar`        | `boolean` | No       | Ignore calendar availability.                 |
-| `ignore_terms`           | `boolean` | No       | Ignore terms and conditions.                  |
-| `ignore_blocks`          | `boolean` | No       | Ignore blocked dates.                         |
-| `coupon_code`            | `string`  | No       | Discount coupon code.                         |
-| `channel`                | `string`  | No       | Reservation channel (e.g., "direct").         |
+The endpoint accepts a JSON object matching the following TypeScript interface:
 
-### Sample Request
-```bash
-curl --request POST \
-     --url https://oaumvyuwtzuyhkwzzxtb.supabase.co/functions/v1/create-reservation \
-     --header 'Authorization: Bearer YOUR_SUPABASE_ANON_KEY' \
-     --header 'Content-Type: application/json' \
-     --data-raw '{
-       "check_in_date_localized": "2025-06-01",
-       "check_out_date_localized": "2025-06-07",
-       "listing_id": "abc123",
-       "source": "website",
-       "guests_count": 2,
-       "guest_id": "guest123",
-       "number_of_adults": 2,
-       "number_of_children": 0,
-       "number_of_infants": 0,
-       "number_of_pets": 0,
-       "ignore_calendar": false,
-       "ignore_terms": false,
-       "ignore_blocks": false,
-       "coupon_code": "SUMMER10",
-       "channel": "direct"
-     }'
+```ts
+interface ReservationRequest {
+  quoteId: string;                   // Required
+  ratePlanId?: string;
+  reservedUntil?: number;            // Defaults to -1 if omitted
+  guestId?: string;                  // Required if 'guest' is not provided
+  guest?: {                          // Required if 'guestId' is not provided
+    firstName: string;
+    lastName: string;
+    phones: string[];                // Must be a non-empty array
+    email: string;
+    address?: object;
+  };
+  ignoreCalendar?: boolean;
+  ignoreTerms?: boolean;
+  ignoreBlocks?: boolean;
+  confirmedAt?: string;
+  confirmationCode?: string;
+  origin?: string;
+  originId?: string;
+}
 ```
 
-## Response
+#### **Validation Rules**
+- You must provide either `guestId` **or** a complete `guest` object.
+- If a `guest` object is provided, all its required fields must be present and `phones` must be a non-empty array.
+- `quoteId` is always required.
 
-### Success Response
-On success, the function returns a JSON object containing the reservation details:
+---
+
+### Example Requests
+
+#### Existing Guest
+
+```bash
+curl -i --location --request POST 'http://localhost:54321/functions/v1/create-reservation' \
+  --header 'Authorization: Bearer YOUR_SUPABASE_ANON_KEY' \
+  --header 'Content-Type: application/json' \
+  --data-raw '{
+    "quoteId": "your-quote-id-here",
+    "guestId": "existing-guest-id",
+    "ratePlanId": "optional-rate-plan-id",
+    "reservedUntil": -1,
+    "ignoreCalendar": false,
+    "ignoreTerms": false,
+    "ignoreBlocks": false,
+    "confirmationCode": "CONF123",
+    "origin": "website",
+    "originId": "web-001"
+  }'
+```
+
+#### New Guest
+
+```bash
+curl -i --location --request POST 'http://localhost:54321/functions/v1/create-reservation' \
+  --header 'Authorization: Bearer YOUR_SUPABASE_ANON_KEY' \
+  --header 'Content-Type: application/json' \
+  --data-raw '{
+    "quoteId": "your-quote-id-here",
+    "guest": {
+      "firstName": "John",
+      "lastName": "Doe",
+      "phones": ["+1234567890"],
+      "email": "john.doe@example.com",
+      "address": {
+        "street": "123 Main St",
+        "city": "Anytown",
+        "state": "CA",
+        "zipCode": "12345"
+      }
+    },
+    "ratePlanId": "optional-rate-plan-id",
+    "reservedUntil": -1,
+    "ignoreCalendar": false,
+    "ignoreTerms": false,
+    "ignoreBlocks": false,
+    "confirmationCode": "CONF123",
+    "origin": "website",
+    "originId": "web-001"
+  }'
+```
+
+---
+
+## Success Response
 
 ```json
 {
   "success": true,
-  "reservation_id": "reservation-id-in-database",
-  "guesty_reservation": {
+  "reservation": {
+    "_id": "guesty-reservation-id",
     "reservationId": "guesty-reservation-id",
-    "guest": {
-      "_id": "guest-id"
-    },
-    "status": "reserved",
-    // Other fields...
+    "status": "confirmed",
+    "confirmationCode": "CONF123"
+    // ...other fields from Guesty API
   },
-  "database_record": {
-    "guest_id": "guest123",
-    "status": "awaiting_payment",
-    "check_in": "2025-06-01T00:00:00Z",
-    "check_out": "2025-06-07T00:00:00Z",
-    // Other fields...
-  }
+  "message": "Reservation created successfully with confirmed status"
 }
 ```
 
-### Error Response
-On error, an appropriate JSON response is returned:
+---
 
-- **400**: Validation errors (e.g., missing fields).
-- **401**: Missing or invalid authorization.
-- **500**: Internal server errors (e.g., Guesty API errors).
+## Error Responses
 
-#### Sample Error Response
+- **405 Method Not Allowed**: If request method is not POST.
+- **401 Unauthorized**: If the authorization header is missing.
+- **400 Bad Request**: If required fields are missing or invalid in the request body.
+- **500 Internal Server Error**: If token fetch fails or there is an unexpected error.
+- **4xx/5xx**: If Guesty API responds with an error; the response will include the error details from Guesty.
+
+Example:
 ```json
 {
-  "error": "Guesty Quote API error: 500",
-  "details": "Detailed error message from Guesty API."
+  "error": "Guesty Reservation API error: 422",
+  "details": "Detailed error returned by Guesty"
 }
 ```
 
 ---
 
-## Next.js Integration
+## Environment Variables
 
-Here is a sample implementation of how to call this edge function using Next.js:
+You must set the following in your Deno environment:
 
-```typescript name=createReservation.ts
-import axios from "axios";
-
-const createReservation = async () => {
-  const url = "https://oaumvyuwtzuyhkwzzxtb.supabase.co/functions/v1/create-reservation";
-
-  const payload = {
-    check_in_date_localized: "2025-06-01",
-    check_out_date_localized: "2025-06-07",
-    listing_id: "abc123",
-    source: "website",
-    guests_count: 2,
-    guest_id: "guest123",
-    number_of_adults: 2,
-    number_of_children: 0,
-    number_of_infants: 0,
-    number_of_pets: 0,
-    ignore_calendar: false,
-    ignore_terms: false,
-    ignore_blocks: false,
-    coupon_code: "SUMMER10",
-    channel: "direct",
-  };
-
-  try {
-    const response = await axios.post(url, payload, {
-      headers: {
-        Authorization: `Bearer YOUR_SUPABASE_ANON_KEY`,
-        "Content-Type": "application/json",
-      },
-    });
-    console.log("Reservation created successfully:", response.data);
-  } catch (error) {
-    console.error("Error creating reservation:", error.response?.data || error.message);
-  }
-};
-
-export default createReservation;
-```
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
 
 ---
 
-## Notes
+## Database Requirements
 
-- Ensure the `Authorization` header contains a valid Supabase token.
-- Dates must be provided in `YYYY-MM-DD` format.
-- Customize the payload as needed based on your application requirements.
+The function expects a `guesty_tokens` table in your Supabase database with an `access_token` column containing a valid Guesty API token.
 
-For further details, consult the [Supabase Edge Functions documentation](https://supabase.com/docs/guides/functions).
+---
+
+## Local Development
+
+1. Start Supabase locally:  
+   ```bash
+   supabase start
+   ```
+
+2. Deploy or run the function, and use the sample curl requests above.
+
+---
+
+## Logging
+
+- Logs initialization, API requests to Guesty, and reservation creation results.
+- Errors are logged with details for debugging.
+
+---
+
+## Related Links
+
+- [Deno: Setup Your Environment](https://deno.land/manual/getting_started/setup_your_environment)
+- [Supabase Edge Functions](https://supabase.com/docs/guides/functions)
+- [Guesty Open API: Reservations](https://open-api.guesty.com/docs)
