@@ -1,219 +1,321 @@
-# Retrieve Listing by ID Edge Function Documentation
+# Retrieve Listing by ID - Supabase Edge Function
 
-This Edge Function retrieves a specific listing from Guesty using the listing ID provided in the request body. It fetches the listing details from the Guesty API, transforms the data into a desired format, and returns a JSON response. The function uses a Supabase database to fetch the Guesty API access token.
+## Overview
 
----
+This Supabase Edge Function retrieves comprehensive listing data from the Guesty API by listing ID and returns it in a structured, frontend-friendly format. The function fetches detailed property information including location, pricing, amenities, pictures, rate plans, and all other relevant data from Guesty's listings endpoint.
 
-## Function Features
+## Endpoint
 
-- **Supabase Integration**: Securely fetches Guesty API tokens from the `guesty_tokens` table.
-- **Guesty API Integration**: Retrieves a listing by ID using the Guesty API and transforms the response.
-- **CORS Support**: Fully handles CORS preflight requests.
-- **Error Handling**: Returns appropriate error messages for missing parameters or API failures.
+**URL:** `/functions/v1/Retrieve-listing-byID`  
+**Method:** `POST`  
+**Content-Type:** `application/json`
 
----
+## Request Format
 
-## How to Deploy
-
-1. **Set up Supabase Edge Functions**:
-   - Follow the [Supabase Edge Functions documentation](https://supabase.com/docs/guides/functions) to deploy this function.
-   - Ensure the environment variables `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are configured in your Supabase project.
-
-2. **Environment Variables**:
-   - `SUPABASE_URL`: Your Supabase project URL.
-   - `SUPABASE_SERVICE_ROLE_KEY`: Your Supabase Service Role Key.
-
-3. **Deploy the Function**:
-   - Save the code in a file named `Retrieve-listing-byID.ts`.
-   - Deploy using the Supabase CLI:
-     ```bash
-     supabase functions deploy Retrieve-listing-byID
-     ```
-
----
-
-## API Endpoint
-
-Once deployed, the function can be accessed via the following endpoint:
-```
-POST {SUPABASE_API_URL}/functions/v1/Retrieve-listing-byID
-```
-
-Replace `{SUPABASE_API_URL}` with your Supabase project's API URL.
-
----
-
-## Request Structure
-
-### CORS Preflight Request
-**Method**: `OPTIONS`  
-Use this method to handle CORS preflight requests.
-
-### Fetch Listing by ID Request
-**Method**: `POST`  
-**Headers**:
-- `Authorization`: Bearer token with appropriate access permissions.
-- `Content-Type`: `application/json`
-
-**Body**:
 ```json
 {
-  "id": "listing_id_here"
+  "id": "679b2773da32a800107fc7c0"
 }
 ```
 
-**Example cURL**:
+### Request Parameters
+
+| Parameter | Type   | Required | Description           |
+|-----------|--------|----------|-----------------------|
+| `id`      | string | Yes      | The Guesty listing ID |
+
+## Response Format
+
+### Success Response (200)
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "679b2773da32a800107fc7c0",
+    "title": "Diana's Hidden Gem",
+    "description": "Discover a chic, brand-new studio in the heart of Central London...",
+    "location": {
+      "city": "Greater London",
+      "country": "United Kingdom",
+      "address": "Devonshire Place, W1G 6HY Greater London, United Kingdom",
+      "neighborhood": "Marylebone",
+      "coordinates": {
+        "lat": 51.5227443,
+        "lng": -0.1500186
+      },
+      "zipcode": "W1G 6HY",
+      "state": "England",
+      "timeZone": "Europe/London"
+    },
+    "pricing": {
+      "basePrice": 200,
+      "currency": "GBP",
+      "cleaningFee": 100,
+      "serviceFee": 0,
+      "securityDeposit": 0
+    },
+    "capacity": {
+      "bedrooms": 0,
+      "bathrooms": 1,
+      "beds": 2,
+      "guests": 3
+    },
+    "amenities": [
+      "Air conditioning",
+      "Wifi",
+      "Kitchen",
+      "Parking"
+    ],
+    "pictures": [
+      "https://assets.guesty.com/image/upload/...",
+      "https://assets.guesty.com/image/upload/..."
+    ],
+    "ratings": {
+      "rating": 4.8,
+      "reviewCount": 156
+    },
+    "checkInOut": {
+      "checkInTime": "16:00",
+      "checkOutTime": "11:00"
+    },
+    "host": {
+      "name": "John Doe",
+      "phone": "+447425114904"
+    },
+    "policies": {
+      "cancellationPolicy": "Flexible",
+      "houseRules": ["No smoking", "No pets"]
+    },
+    "rates": [
+      {
+        "platform": "bookingCom",
+        "internalRatePlanId": "67aa3c85546cbf6957c45820",
+        "externalRatePlanId": "52337718",
+        "status": "ACTIVE",
+        "rateName": "Guesty - 5820 - The Rate Plan",
+        "currency": "GBP",
+        "hotelId": 9849029
+      }
+    ],
+    "propertyType": "Serviced apartment",
+    "roomType": "Entire home/apt",
+    "listingType": "short_term_rental",
+    "accommodates": 3,
+    "publicDescription": {
+      "summary": "...",
+      "space": "...",
+      "neighborhood": "...",
+      "transit": "...",
+      "notes": "...",
+      "houseRules": "..."
+    },
+    "amenitiesNotIncluded": [],
+    "taxes": [],
+    "defaultCheckInTime": "16:00",
+    "defaultCheckOutTime": "11:00",
+    "isListed": true,
+    "active": true,
+    "integrations": [...],
+    "nickname": "17A1 Devonshre Place",
+    "accountId": "679a424e85f74b5fe968cec2",
+    "createdAt": "2025-01-30T07:17:07.766Z",
+    "lastUpdatedAt": "2025-05-19T08:56:59.114Z",
+    "customFields": [...]
+  }
+}
+```
+
+### Error Responses
+
+#### 400 - Bad Request
+```json
+{
+  "error": "Listing ID is required"
+}
+```
+
+#### 500 - Server Error
+```json
+{
+  "error": "Failed to retrieve Guesty access token"
+}
+```
+
+```json
+{
+  "error": "Failed to fetch listing from Guesty",
+  "details": "Error details from Guesty API",
+  "status": 404
+}
+```
+
+```json
+{
+  "error": "Internal server error",
+  "details": "Error message"
+}
+```
+
+## Response Data Structure
+
+### Core Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Unique listing identifier |
+| `title` | string | Listing title/name |
+| `description` | string | Property description |
+| `location` | object | Complete location information |
+| `pricing` | object | Pricing details including fees |
+| `capacity` | object | Property capacity (bedrooms, bathrooms, etc.) |
+| `amenities` | array | List of available amenities |
+| `pictures` | array | Array of image URLs |
+| `ratings` | object | Rating and review count |
+| `checkInOut` | object | Check-in and check-out times |
+| `host` | object | Host information |
+| `policies` | object | Cancellation policy and house rules |
+
+### Rate Plans
+
+The `rates` array contains booking platform rate plan information:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `platform` | string | Always "bookingCom" |
+| `internalRatePlanId` | string | Internal Guesty rate plan ID |
+| `externalRatePlanId` | string | External platform rate plan ID |
+| `status` | string | Rate plan status (ACTIVE, INACTIVE) |
+| `rateName` | string | Human-readable rate plan name |
+| `currency` | string | Rate plan currency |
+| `hotelId` | number | Hotel ID on the booking platform |
+
+### Additional Guesty Fields
+
+The response includes comprehensive Guesty-specific data:
+- `propertyType`: Type of property (apartment, house, etc.)
+- `roomType`: Room type (entire place, private room, etc.)
+- `integrations`: Array of platform integrations
+- `customFields`: Custom property fields
+- `publicDescription`: Detailed description sections
+- `calendarRules`: Booking and availability rules
+
+## Usage Examples
+
+### cURL (Local Development)
+
 ```bash
 curl -i --location --request POST 'http://127.0.0.1:54321/functions/v1/Retrieve-listing-byID' \
-  --header 'Authorization: Bearer YOUR_ACCESS_TOKEN' \
+  --header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0' \
   --header 'Content-Type: application/json' \
-  --data '{"id":"listing_id_here"}'
+  --data '{"id":"679b2773da32a800107fc7c0"}'
 ```
 
----
+### cURL (Production)
 
-## Response Structure
-
-### Success Response
-**Status Code**: `200`  
-**Body**:
-```json
-{
-  "status": "success",
-  "data": {
-    "id": "listing_id",
-    "title": "Listing Title",
-    "location": "City, Country",
-    "area": "Street Address",
-    "rating": 4.5,
-    "reviews": 120,
-    "bedroom": 2,
-    "beds": 3,
-    "bath": 2,
-    "guests": 4,
-    "dateRange": "Available Now",
-    "pricePerNight": 100,
-    "totalPrice": 100,
-    "images": ["image1_url", "image2_url"],
-    "isFavorite": false
-  }
-}
+```bash
+curl -i --location --request POST 'https://your-project.supabase.co/functions/v1/Retrieve-listing-byID' \
+  --header 'Authorization: Bearer YOUR_SUPABASE_TOKEN' \
+  --header 'Content-Type: application/json' \
+  --data '{"id":"679b2773da32a800107fc7c0"}'
 ```
 
-### Error Response
-**Status Code**: `400`  
-**Body** (for missing listing ID):
-```json
-{
-  "status": "error",
-  "message": "Listing ID is required in request body"
-}
+### PowerShell
+
+```powershell
+curl.exe -i --location --request POST 'http://127.0.0.1:54321/functions/v1/Retrieve-listing-byID' `
+  --header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0' `
+  --header 'Content-Type: application/json' `
+  --data '{"id":"679b2773da32a800107fc7c0"}'
 ```
 
-**Status Code**: `500`  
-**Body**:
-```json
-{
-  "status": "error",
-  "message": "Error message describing the issue."
-}
+### JavaScript/TypeScript
+
+```typescript
+const response = await fetch('/functions/v1/Retrieve-listing-byID', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer YOUR_TOKEN',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    id: '679b2773da32a800107fc7c0'
+  })
+});
+
+const data = await response.json();
+console.log(data);
 ```
 
----
+## Prerequisites
 
-## How to Call This Function in a Next.js Application
+1. **Guesty Access Token**: The function requires a valid Guesty access token stored in the `guesty_tokens` table in your Supabase database.
 
-You can invoke this Edge Function from a Next.js application using the `fetch` API.
-
-### Example Code
-
-```typescript name=call-edge-function.ts
-export async function getListingById(listingId) {
-  const apiUrl = `${process.env.NEXT_PUBLIC_SUPABASE_API_URL}/functions/v1/Retrieve-listing-byID`;
-  const token = process.env.SUPABASE_FUNCTION_TOKEN;
-
-  try {
-    const response = await fetch(apiUrl, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ id: listingId }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || "Failed to retrieve listing");
-    }
-
-    const data = await response.json();
-    return data.data; // The transformed listing data
-  } catch (error) {
-    console.error("Error fetching listing:", error.message);
-    throw error;
-  }
-}
-```
-
-### Steps to Integrate
-
-1. **Set Up Environment Variables**:
-   - Add the following to your `.env.local` file:
-     ```env
-     NEXT_PUBLIC_SUPABASE_API_URL=https://your-supabase-url.supabase.co
-     SUPABASE_FUNCTION_TOKEN=your-function-access-token
-     ```
-
-2. **Import the Function**:
-   Import and use the `getListingById` function in your Next.js components or pages.
-
-   ```typescript name=index.tsx
-   import { useState } from "react";
-   import { getListingById } from "./call-edge-function";
-
-   export default function ListingPage() {
-     const [listing, setListing] = useState(null);
-     const [error, setError] = useState(null);
-
-     async function handleFetchListing() {
-       try {
-         const data = await getListingById("your_listing_id_here");
-         setListing(data);
-       } catch (err) {
-         setError(err.message);
-       }
-     }
-
-     return (
-       <div>
-         <h1>Listing Details</h1>
-         <button onClick={handleFetchListing}>Fetch Listing</button>
-         {error && <div>Error: {error}</div>}
-         {listing && (
-           <div>
-             <h2>{listing.title}</h2>
-             <p>{listing.location}</p>
-             <p>Price per night: ${listing.pricePerNight}</p>
-           </div>
-         )}
-       </div>
-     );
-   }
+2. **Database Setup**: Ensure the `guesty_tokens` table exists with the following structure:
+   ```sql
+   CREATE TABLE guesty_tokens (
+     access_token TEXT NOT NULL
+   );
    ```
 
-3. **Run the Application**:
-   - Start your Next.js development server:
-     ```bash
-     npm run dev
-     ```
+3. **Environment Variables**: Ensure `SUPABASE_URL` and `SUPABASE_ANON_KEY` are properly configured.
 
-   - Navigate to the page where the listing details are displayed.
+## Dependencies
 
----
+- `@supabase/functions-js` - Supabase Edge Runtime
+- `@supabase/supabase-js` - Supabase client library
 
-## Additional Notes
+## Local Development
 
-- Ensure that your Supabase project has the `guesty_tokens` table with valid access tokens for Guesty.
-- Handle your Supabase Service Role Key securely and never expose it in client-side code.
-- Use appropriate error handling for production-grade implementations.
+1. Start Supabase locally:
+   ```bash
+   supabase start
+   ```
+
+2. Deploy the function:
+   ```bash
+   supabase functions deploy Retrieve-listing-byID
+   ```
+
+3. Test the function using the provided cURL examples.
+
+## Deployment
+
+Deploy to production:
+```bash
+supabase functions deploy Retrieve-listing-byID --project-ref YOUR_PROJECT_ID
+```
+
+## Error Handling
+
+The function includes comprehensive error handling for:
+- Missing listing ID in request
+- Invalid or expired Guesty tokens
+- Network errors when calling Guesty API
+- Invalid listing IDs
+- General server errors
+
+All errors are returned with appropriate HTTP status codes and descriptive error messages.
+
+## Rate Limiting
+
+This function is subject to:
+- Supabase Edge Functions rate limits
+- Guesty API rate limits
+
+Ensure your usage patterns comply with both platforms' rate limiting policies.
+
+## Security
+
+- All requests require valid Supabase authentication
+- Guesty tokens are securely stored in the database
+- CORS headers are properly configured
+- No sensitive data is logged or exposed
+
+## Changelog
+
+### v1.0.0
+- Initial implementation with comprehensive Guesty data mapping
+- Support for bookingCom rate plan extraction
+- Full CORS support
+- Comprehensive error handling
