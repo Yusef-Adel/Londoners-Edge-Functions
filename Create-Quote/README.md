@@ -90,7 +90,7 @@ Define the following environment variables:
 
 ### Curl Command
 ```bash
-curl -i --location --request POST 'http://localhost:54321/functions/v1/Create-Quote' \
+curl -i --location --request POST 'https://oaumvyuwtzuyhkwzzxtb.supabase.co/functions/v1/Create-Quote' \
 --header 'Authorization: Bearer YOUR_SUPABASE_ANON_KEY' \
 --header 'Content-Type: application/json' \
 --data-raw '{
