@@ -1,198 +1,367 @@
-# Listing Search API Documentation
+# Listing Search Edge Function
 
-The Listing Search API allows you to query and retrieve property listings from the Guesty API. The data is structured to include useful information such as location, title, price, and more.
+A Supabase Edge Function that interfaces with the Guesty API to search and retrieve property listings with advanced filtering capabilities.
+
+## Overview
+
+This function provides a comprehensive search interface for Guesty property listings, transforming the raw API data into a structured format suitable for frontend applications. It supports various search parameters including availability dates, occupancy requirements, location filters, and more.
 
 ## API Endpoint
-```
-POST https://oaumvyuwtzuyhkwzzxtb.supabase.co/functions/v1/listing-search
-```
 
-## Features
-- Query property listings using various filters such as `ids`, `nids`, `q`, `t.city`, `active`, and more.
-- Handles pagination using `limit` and `skip` parameters.
-- Automatically fetches and utilizes the latest Guesty token stored in the Supabase database.
-- Includes a fallback mechanism to retry searches without the `availability` filter if no results are found.
+- **Method:** POST
+- **Local URL:** `http://127.0.0.1:54321/functions/v1/listing-search`
+- **Production URL:** `https://your-project-ref.supabase.co/functions/v1/listing-search`
 
----
+## Request Format
 
-## Request Headers
-| Header                  | Value                         |
-|-------------------------|-------------------------------|
-| Content-Type            | `application/json`            |
-| Access-Control-Allow-Origin | `*`                      |
+Send a POST request with a JSON body containing search parameters:
 
-## Request Parameters
-The request body must be a JSON object with the following optional parameters:
-
-| Parameter          | Type     | Description                                           | Example                       |
-|---------------------|----------|-------------------------------------------------------|-------------------------------|
-| `ids`              | `string` | Comma-separated list of listing IDs.                  | `"123,456"`                   |
-| `nids`             | `string` | Comma-separated list of room IDs.                     | `"789,101"`                   |
-| `viewId`           | `string` | ID of the specific view to query.                     | `"view123"`                   |
-| `q`                | `string` | Search query.                                         | `"beach"`                     |
-| `t.city`           | `string` | Filter by city name.                                  | `"Miami"`                     |
-| `active`           | `boolean`| Filter for active listings.                          | `true`                        |
-| `pmsActive`        | `boolean`| Filter for PMS active listings.                      | `false`                       |
-| `integrationId`    | `string` | Filter by integration ID.                            | `"integration123"`            |
-| `listed`           | `boolean`| Filter for listed properties.                        | `true`                        |
-| `available`        | `object` | Availability filter.                                  | `{ "checkIn": "2025-06-01", "checkOut": "2025-06-07" }` |
-| `tags`             | `string` | Comma-separated list of tags.                        | `"luxury,beachfront"`         |
-| `fields`           | `string` | Comma-separated list of fields to retrieve.          | `"title,location,price"`      |
-| `limit`            | `number` | Maximum number of results per page (default: 25).    | `10`                          |
-| `skip`             | `number` | Number of results to skip for pagination (default: 0).| `0`                           |
-
----
-
-## Example CURL Request
-
-```bash
-curl -i --location --request POST 'https://oaumvyuwtzuyhkwzzxtb.supabase.co/functions/v1/listing-search' \
---header 'Content-Type: application/json' \
---data-raw '{
-  "q": "beach",
-  "limit": 10,
-  "t.city": "Miami",
+```json
+{
+  "parameter": "value",
   "available": {
-    "checkIn": "2025-06-01",
-    "checkOut": "2025-06-07"
+    "checkIn": "2025-07-01",
+    "checkOut": "2025-07-07",
+    "minOccupancy": 2
   }
-}'
+}
 ```
 
----
+## Supported Parameters
 
-## Example Response
+### Basic Search Parameters
+
+| Parameter | Type | Description | Example |
+|-----------|------|-------------|---------|
+| `q` | string | Search query for title, internal notes, or address | `"beach house"` |
+| `city` | string | Filter by city name | `"Miami"` |
+| `ids` | string | Comma-separated list of specific listing IDs | `"id1,id2,id3"` |
+| `nids` | string | Comma-separated list of listing IDs to exclude | `"id4,id5"` |
+| `tags` | string | Filter by listing tags | `"pool,wifi"` |
+
+### Availability & Occupancy
+
+| Parameter | Type | Description | Example |
+|-----------|------|-------------|---------|
+| `available` | object | Availability and occupancy filter | See below |
+| `available.checkIn` | string | Check-in date (YYYY-MM-DD) | `"2025-07-01"` |
+| `available.checkOut` | string | Check-out date (YYYY-MM-DD) | `"2025-07-07"` |
+| `available.minOccupancy` | number | Minimum guest capacity | `2` |
+| `ignoreFlexibleBlocks` | boolean | Include listings with flexible booking blocks | `false` |
+
+### Status Filters
+
+| Parameter | Type | Description | Default | Example |
+|-----------|------|-------------|---------|---------|
+| `active` | boolean | Filter by active status | `true` | `true` |
+| `listed` | boolean | Filter by listed status | `true` | `true` |
+| `pmsActive` | boolean | Filter by PMS active status | `true` | `true` |
+
+### Advanced Parameters
+
+| Parameter | Type | Description | Example |
+|-----------|------|-------------|---------|
+| `viewId` | string | Use a specific saved view | `"view123"` |
+| `integrationId` | string | Filter by integration ID | `"integration456"` |
+| `fields` | string | Specify fields to return (space-separated) | `"title address pricing"` |
+| `sort` | string | Sort field (use `-` for descending) | `"title"` or `"-title"` |
+
+### Pagination
+
+| Parameter | Type | Description | Default | Max | Example |
+|-----------|------|-------------|---------|-----|---------|
+| `limit` | number | Number of results to return | `25` | `100` | `50` |
+| `skip` | number | Number of results to skip | `0` | - | `25` |
+
+### Testing Parameters
+
+| Parameter | Type | Description | Example |
+|-----------|------|-------------|---------|
+| `testOccupancyOnly` | boolean | Test occupancy filtering without date restrictions | `true` |
+
+## Response Format
 
 ### Success Response
+
 ```json
 {
   "status": "success",
   "message": "Listings retrieved successfully",
   "data": [
     {
-      "id": "123",
-      "title": "Beachfront Paradise",
-      "location": "Miami, USA",
+      "id": "listing_id",
+      "title": "Beautiful Beach House",
+      "location": "Miami, United States",
       "area": "South Beach",
       "rating": 4.8,
-      "reviews": 120,
+      "reviews": 127,
       "bedroom": 3,
       "beds": 4,
       "bath": 2,
       "guests": 6,
       "dateRange": "Available Now",
-      "pricePerNight": 200,
-      "totalPrice": 1400,
-      "images": ["https://example.com/image1.jpg"],
-      "isFavorite": false
+      "pricePerNight": 250,
+      "totalPrice": 1750,
+      "images": ["url1", "url2", "url3"],
+      "isFavorite": false,
+      "amenities": ["WiFi", "Pool", "Kitchen"]
     }
   ],
-  "totalCount": 1,
+  "totalCount": 42,
   "page": 1,
-  "limit": 10
+  "limit": 25
 }
 ```
 
 ### Error Response
+
 ```json
 {
   "status": "error",
-  "message": "Internal server error",
-  "details": "Failed to fetch token: Token not found"
+  "message": "Error description",
+  "details": "Detailed error information"
 }
 ```
 
----
+## Usage Examples
 
-## Next.js Implementation Example
+### Basic Search
 
-Here is an example of how to integrate the API in a Next.js application:
-
-```javascript
-// pages/api/listings.js
-
-export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  try {
-    const response = await fetch('https://oaumvyuwtzuyhkwzzxtb.supabase.co/functions/v1/listing-search', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(req.body),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.text();
-      return res.status(response.status).json({ error: 'Failed to fetch listings', details: errorData });
-    }
-
-    const data = await response.json();
-    res.status(200).json(data);
-  } catch (error) {
-    console.error('Error fetching listings:', error);
-    res.status(500).json({ error: 'Internal server error', details: error.message });
-  }
-}
+```bash
+curl -i --location --request POST 'http://127.0.0.1:54321/functions/v1/listing-search' \
+  --header 'Content-Type: application/json' \
+  --data-raw '{}'
 ```
 
-### Example Usage in a React Component
+### Search by Query
+
+```bash
+curl -i --location --request POST 'http://127.0.0.1:54321/functions/v1/listing-search' \
+  --header 'Content-Type: application/json' \
+  --data-raw '{"q":"beach house","limit":10}'
+```
+
+### Search by City
+
+```bash
+curl -i --location --request POST 'http://127.0.0.1:54321/functions/v1/listing-search' \
+  --header 'Content-Type: application/json' \
+  --data-raw '{"city":"Miami","limit":15}'
+```
+
+### Availability Search
+
+```bash
+curl -i --location --request POST 'http://127.0.0.1:54321/functions/v1/listing-search' \
+  --header 'Content-Type: application/json' \
+  --data-raw '{
+    "available": {
+      "checkIn": "2025-07-01",
+      "checkOut": "2025-07-07", 
+      "minOccupancy": 2
+    },
+    "limit": 20
+  }'
+```
+
+### Advanced Search
+
+```bash
+curl -i --location --request POST 'http://127.0.0.1:54321/functions/v1/listing-search' \
+  --header 'Content-Type: application/json' \
+  --data-raw '{
+    "city": "Miami",
+    "active": true,
+    "listed": true,
+    "pmsActive": true,
+    "available": {
+      "checkIn": "2025-07-15",
+      "checkOut": "2025-07-20",
+      "minOccupancy": 4
+    },
+    "ignoreFlexibleBlocks": false,
+    "tags": "pool,wifi",
+    "sort": "title",
+    "limit": 25,
+    "skip": 0
+  }'
+```
+
+### Test Occupancy Only (No Date Restrictions)
+
+```bash
+curl -i --location --request POST 'http://127.0.0.1:54321/functions/v1/listing-search' \
+  --header 'Content-Type: application/json' \
+  --data-raw '{
+    "available": {
+      "minOccupancy": 2
+    },
+    "testOccupancyOnly": true
+  }'
+```
+
+### Pagination Example
+
+```bash
+curl -i --location --request POST 'http://127.0.0.1:54321/functions/v1/listing-search' \
+  --header 'Content-Type: application/json' \
+  --data-raw '{"limit":10,"skip":20}'
+```
+
+### Custom Fields
+
+```bash
+curl -i --location --request POST 'http://127.0.0.1:54321/functions/v1/listing-search' \
+  --header 'Content-Type: application/json' \
+  --data-raw '{
+    "fields": "title address accommodationDetails pricing pictures",
+    "limit": 10
+  }'
+```
+
+## JavaScript/TypeScript Usage
+
+### Basic Fetch Example
 
 ```javascript
-import { useState } from 'react';
+const searchListings = async (params = {}) => {
+  const response = await fetch('http://127.0.0.1:54321/functions/v1/listing-search', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(params)
+  });
+  
+  return await response.json();
+};
 
-export default function ListingsSearch() {
+// Usage
+const results = await searchListings({
+  city: "Miami",
+  available: {
+    checkIn: "2025-07-01",
+    checkOut: "2025-07-07",
+    minOccupancy: 2
+  },
+  limit: 10
+});
+```
+
+### React Hook Example
+
+```javascript
+import { useState, useEffect } from 'react';
+
+const useListingSearch = (searchParams) => {
   const [listings, setListings] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const searchListings = async () => {
-    try {
-      const response = await fetch('/api/listings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          q: 'beach',
-          limit: 10,
-          t.city: 'Miami',
-          available: {
-            checkIn: '2025-06-01',
-            checkOut: '2025-06-07',
-          },
-        }),
-      });
-
-      const data = await response.json();
-      if (response.ok) {
-        setListings(data.data);
-      } else {
-        setError(data.error || 'Failed to fetch listings');
+  useEffect(() => {
+    const searchListings = async () => {
+      setLoading(true);
+      setError(null);
+      
+      try {
+        const response = await fetch('http://127.0.0.1:54321/functions/v1/listing-search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(searchParams)
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+          setListings(data.data);
+        } else {
+          setError(data.message);
+        }
+      } catch (err) {
+        setError('Failed to fetch listings');
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      setError(err.message || 'Internal server error');
-    }
-  };
+    };
 
-  return (
-    <div>
-      <button onClick={searchListings}>Search Listings</button>
-      {error && <p>Error: {error}</p>}
-      <ul>
-        {listings.map((listing) => (
-          <li key={listing.id}>
-            <h3>{listing.title}</h3>
-            <p>{listing.location}</p>
-            <p>${listing.pricePerNight} per night</p>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
+    if (searchParams) {
+      searchListings();
+    }
+  }, [searchParams]);
+
+  return { listings, loading, error };
+};
 ```
 
---- 
+## Important Notes
 
-This documentation provides a complete guide to using the API, testing it via CURL, and implementing it in a Next.js application.
+### Availability Filtering
+
+- The `available` parameter filters listings that are actually available during the specified dates
+- If no listings are available for the specified dates, you may get empty results even if listings exist
+- Use `testOccupancyOnly: true` to test occupancy filtering without date restrictions
+
+### Occupancy Logic
+
+- `minOccupancy` filters for listings that can accommodate **at least** the specified number of guests
+- For example, `minOccupancy: 2` will return listings for 2, 3, 4+ guests but not 1-guest listings
+- Client-side filtering is applied after the API call to ensure accurate guest capacity matching
+
+### Performance Considerations
+
+- Default pagination limit is 25, maximum is 100
+- Use pagination (`skip` and `limit`) for large result sets
+- Consider using specific `fields` parameter to reduce response size
+- Empty parameter object `{}` returns all listings with default pagination
+
+### Error Handling
+
+The function handles various error scenarios:
+- Invalid Guesty API responses
+- Missing authentication tokens
+- Network timeouts
+- Invalid parameter formats
+
+Always check the `status` field in the response to determine success or failure.
+
+## Development
+
+### Local Testing
+
+1. Start Supabase locally: `supabase start`
+2. Use the provided curl examples or integrate with your frontend application
+3. Monitor logs for debugging information
+
+### Environment Variables
+
+Ensure these environment variables are set:
+- `SUPABASE_URL`: Your Supabase project URL
+- `SUPABASE_SERVICE_ROLE_KEY`: Your service role key
+
+### Dependencies
+
+- Deno runtime
+- Supabase Edge Functions
+- Valid Guesty API token stored in `guesty_tokens` table
+
+## Troubleshooting
+
+### Empty Results
+
+1. Check if listings are available for your specified dates
+2. Try removing date restrictions with `testOccupancyOnly: true`
+3. Verify occupancy requirements aren't too restrictive
+4. Check console logs for API debugging information
+
+### Authentication Errors
+
+1. Ensure Guesty token exists in the database
+2. Verify token hasn't expired
+3. Check database connection and permissions
+
+### Rate Limiting
+
+The Guesty API may have rate limits. If you encounter rate limiting:
+1. Implement request delays in your application
+2. Use pagination to reduce large requests
+3. Cache results when possible
