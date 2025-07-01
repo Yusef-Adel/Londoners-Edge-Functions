@@ -1,145 +1,274 @@
-# Quote Creator Edge Function
+# Create-Quote Edge Function
 
 ## Overview
 
-The Quote Creator Edge Function is a serverless function designed to handle quote requests for listings. It interacts with Guesty and Supabase to fetch pricing details and persist quotes in the database. It supports CORS and includes robust error handling.
+The Create-Quote edge function creates a price quote for a reservation through the Guesty API. It handles detailed guest breakdowns, validates input data, and stores the quote information in the database.
 
-### Key Features:
-- Validates input for required fields and proper formats.
-- Generates quotes using Guesty API.
-- Stores quotes in Supabase database.
-- Comprehensive CORS headers for cross-origin requests.
-- Handles preflight requests for OPTIONS.
+## Endpoint
 
----
+```
+POST /functions/v1/Create-Quote
+```
 
-## Setup Guide
+## Authentication
 
-### Prerequisites
-1. **Deno Environment**: Set up the Deno language server for your editor. Follow the [Deno setup guide](https://deno.land/manual/getting_started/setup_your_environment).
-2. **Supabase**: Ensure Supabase is running locally. Refer to the [Supabase CLI documentation](https://supabase.com/docs/reference/cli/supabase-start).
+Requires a valid Supabase authorization token in the `Authorization` header:
 
-### Environment Variables
-Define the following environment variables:
-- `SUPABASE_URL`: The base URL for your Supabase instance.
-- `SUPABASE_ANON_KEY`: The Supabase anonymous key for authentication.
+```
+Authorization: Bearer <your-supabase-token>
+```
 
----
+## Request Body
 
-## How It Works
+### Required Fields
 
-### Request Structure
-**Endpoint**: `http://localhost:54321/functions/v1/Create-Quote`  
-**Method**: `POST`  
+| Field | Type | Description |
+|-------|------|-------------|
+| `check_in_date_localized` | string | Check-in date in YYYY-MM-DD format |
+| `check_out_date_localized` | string | Check-out date in YYYY-MM-DD format |
+| `listing_id` | string | Unique identifier for the listing |
+| `source` | string | Source of the reservation (e.g., "website", "app") |
+| `guests_count` | number | Total number of guests (must be ≥ 1) |
 
-#### Request Body
+### Optional Fields
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `number_of_adults` | number | `guests_count` | Number of adults (must be ≥ 1) |
+| `number_of_children` | number | 0 | Number of children (must be ≥ 0) |
+| `number_of_infants` | number | 0 | Number of infants (must be ≥ 0) |
+| `number_of_pets` | number | 0 | Number of pets (must be ≥ 0) |
+| `ignore_calendar` | boolean | false | Whether to ignore calendar availability |
+| `ignore_terms` | boolean | false | Whether to ignore terms and conditions |
+| `ignore_blocks` | boolean | false | Whether to ignore booking blocks |
+| `coupon_code` | string | null | Promotional coupon code |
+
+## Guest Count Validation
+
+The function validates that the total guest count equals the sum of adults, children, and infants:
+
+```
+guests_count = number_of_adults + number_of_children + number_of_infants
+```
+
+If `number_of_adults` is not provided, it defaults to the full `guests_count`.
+
+## Request Examples
+
+### Basic Request
+
 ```json
 {
-  "check_in_date_localized": "2025-06-01",
-  "check_out_date_localized": "2025-06-07",
+  "check_in_date_localized": "2025-07-15",
+  "check_out_date_localized": "2025-07-20",
   "listing_id": "abc123",
   "source": "website",
-  "guests_count": 2,
-  "ignore_calendar": false,
-  "ignore_terms": false,
-  "ignore_blocks": false,
-  "coupon_code": "SUMMER10"
+  "guests_count": 2
 }
 ```
 
-#### Headers
-- `Authorization`: Bearer token for Supabase authentication.
-- `Content-Type`: `application/json`.
+### Detailed Request with Guest Breakdown
 
-### Response Structure
-#### Success Response
+```json
+{
+  "check_in_date_localized": "2025-07-15",
+  "check_out_date_localized": "2025-07-20",
+  "listing_id": "abc123",
+  "source": "mobile_app",
+  "guests_count": 4,
+  "number_of_adults": 2,
+  "number_of_children": 1,
+  "number_of_infants": 1,
+  "number_of_pets": 1,
+  "ignore_calendar": false,
+  "ignore_terms": false,
+  "ignore_blocks": false,
+  "coupon_code": "SUMMER25"
+}
+```
+
+## Response Format
+
+### Success Response (200)
+
 ```json
 {
   "success": true,
-  "quote_id": "unique_quote_id",
+  "quote_id": "local_quote_id_123",
   "guesty_quote": {
     "id": "guesty_quote_id",
+    "_id": "guesty_internal_id",
     "pricing": {
-      "total": 500,
+      "total": 500.00,
       "currency": "USD"
     }
   },
   "database_record": {
-    "check_in_date_localized": "2025-06-01",
-    "check_out_date_localized": "2025-06-07",
+    "quote_id": "local_quote_id_123",
+    "check_in_date_localized": "2025-07-15",
+    "check_out_date_localized": "2025-07-20",
     "listing_id": "abc123",
     "source": "website",
-    "guests_count": 2,
-    "coupon_code": "SUMMER10",
-    "guesty_quote_id": "guesty_quote_id"
+    "guests_count": 4,
+    "number_of_adults": 2,
+    "number_of_children": 1,
+    "number_of_infants": 1,
+    "number_of_pets": 1,
+    "guesty_quote_id": "guesty_internal_id",
+    "created_at": "2025-07-01T10:00:00Z"
   }
 }
 ```
 
-#### Error Response
+### Error Responses
+
+#### 400 - Bad Request
+
 ```json
 {
-  "error": "An unexpected error occurred",
-  "details": "Error message"
+  "error": "Missing required field: check_in_date_localized"
 }
 ```
 
----
+```json
+{
+  "error": "Total guest count must equal sum of adults, children, and infants",
+  "details": "Expected: 4, Got: 3"
+}
+```
 
-## Example Usage
+```json
+{
+  "error": "Check-in date must be before check-out date"
+}
+```
 
-### Curl Command
+#### 401 - Unauthorized
+
+```json
+{
+  "error": "Missing authorization header"
+}
+```
+
+#### 500 - Internal Server Error
+
+```json
+{
+  "error": "Failed to retrieve Guesty API token"
+}
+```
+
+```json
+{
+  "error": "Guesty API error: 400",
+  "details": "Invalid listing ID"
+}
+```
+
+## Validation Rules
+
+### Date Validation
+- Check-in date must be before check-out date
+- Dates must be in valid YYYY-MM-DD format
+
+### Guest Count Validation
+- Total guests must be at least 1
+- Adults must be at least 1
+- Children, infants, and pets must be non-negative
+- Sum of adults + children + infants must equal total guests
+
+### Required Fields
+- All required fields must be present and non-empty
+- String fields cannot be empty or null
+
+## CORS Support
+
+The function includes comprehensive CORS headers to support cross-origin requests:
+
+```
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS
+Access-Control-Allow-Headers: authorization, x-client-info, apikey, content-type, x-requested-with, accept, origin, referer, user-agent
+```
+
+## Database Integration
+
+The function stores quote information in the `quotes` table with the following fields:
+- Local quote tracking information
+- Guest breakdown details
+- Guesty quote ID for reference
+- Request parameters for audit trail
+
+## Guesty API Integration
+
+The function communicates with the Guesty API at:
+```
+POST https://open-api.guesty.com/v1/quotes
+```
+
+The request includes detailed guest breakdown information as required by the Guesty API specification.
+
+## Local Development
+
+### Prerequisites
+- Supabase CLI installed
+- Local Supabase instance running
+- Valid Guesty API token in the database
+
+### Testing
+
 ```bash
-curl -i --location --request POST 'https://oaumvyuwtzuyhkwzzxtb.supabase.co/functions/v1/Create-Quote' \
+# Start local Supabase
+supabase start
+
+# Test the function
+curl -i --location --request POST 'http://localhost:54321/functions/v1/Create-Quote' \
 --header 'Authorization: Bearer YOUR_SUPABASE_ANON_KEY' \
 --header 'Content-Type: application/json' \
 --data-raw '{
-  "check_in_date_localized": "2025-06-01",
-  "check_out_date_localized": "2025-06-07",
+  "check_in_date_localized": "2025-07-15",
+  "check_out_date_localized": "2025-07-20",
   "listing_id": "abc123",
   "source": "website",
-  "guests_count": 2,
+  "guests_count": 4,
+  "number_of_adults": 2,
+  "number_of_children": 1,
+  "number_of_infants": 1,
+  "number_of_pets": 0,
   "ignore_calendar": false,
   "ignore_terms": false,
   "ignore_blocks": false,
-  "coupon_code": "SUMMER10"
+  "coupon_code": "SUMMER25"
 }'
 ```
 
----
+## Error Handling
 
-## Notes
+The function includes comprehensive error handling for:
+- Missing or invalid input data
+- Authentication failures
+- Guesty API errors
+- Database connection issues
+- Unexpected server errors
 
-1. **Error Handling**:
-   - Missing required fields.
-   - Invalid date formats.
-   - Check-in date must precede the check-out date.
-   - Failed Guesty API or database operations.
+All errors are returned with appropriate HTTP status codes and descriptive error messages.
 
-2. **CORS**:
-   - Allows requests from any origin.
-   - Handles preflight OPTIONS requests.
+## Security Considerations
 
-3. **Supabase Database**:
-   - Stores Guesty token.
-   - Persists quotes after successful creation.
+- All requests require valid Supabase authentication
+- Input validation prevents injection attacks
+- Error messages don't expose sensitive system information
+- CORS headers are configured for secure cross-origin access
 
----
+## Dependencies
 
-## Development
+- Deno Standard Library HTTP Server
+- Supabase JavaScript Client
+- Guesty Open API (external)
 
-### Local Testing
-1. Start Supabase locally using `supabase start`.
-2. Use the provided curl command to test the function.
+## Version History
 
-### Logs
-Check logs for debugging:
-```bash
-tail -f supabase/logs/functions.log
-```
-
----
-
-## External References
-- [Deno Setup Guide](https://deno.land/manual/getting_started/setup_your_environment)
-- [Supabase CLI Documentation](https://supabase.com/docs/reference/cli/supabase-start)
+- **v1.0.0**: Initial implementation with basic quote creation
+- **v1.1.0**: Added detailed guest breakdown support (adults, children, infants, pets)
+- **v1.1.1**: Enhanced validation and error handling
