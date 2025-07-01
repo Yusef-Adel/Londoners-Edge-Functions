@@ -6,37 +6,6 @@ A Supabase Edge Function for retrieving reviews and ratings statistics for prope
 
 This function allows you to fetch reviews for a specific property listing with comprehensive statistics including overall ratings, category-specific averages, rating distributions, and pagination support. It provides both individual review details and aggregated statistics in a single response.
 
-## Database Schema
-
-The function reads from two main tables:
-
-### `reviews` Table
-```sql
-CREATE TABLE reviews (
-  review_id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-  listing_id TEXT,
-  guest_id TEXT,
-  review_text TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  overall_rating FLOAT
-);
-```
-
-### `review_ratings` Table
-```sql
-CREATE TABLE review_ratings (
-  rating_id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-  review_id BIGINT,
-  cleanliness FLOAT,
-  accuracy FLOAT,
-  check_in FLOAT,
-  communication FLOAT,
-  location FLOAT,
-  value FLOAT,
-  FOREIGN KEY (review_id) REFERENCES reviews (review_id)
-);
-```
-
 ## API Specification
 
 ### Endpoint
