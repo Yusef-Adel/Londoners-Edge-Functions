@@ -51,7 +51,39 @@ The function validates that the total guest count equals the sum of adults, chil
 guests_count = number_of_adults + number_of_children + number_of_infants
 ```
 
-If `number_of_adults` is not provided, it defaults to the full `guests_count`.
+**Important Notes:**
+- If `number_of_adults` is not provided, it defaults to the full `guests_count`
+- The validation only applies when detailed guest breakdown fields are explicitly provided
+- Pets are not included in the total guest count calculation
+- Only non-zero guest breakdown values are sent to the Guesty API for optimal performance
+
+## API Request Structure
+
+The function transforms your input into the Guesty API's expected nested format:
+
+**Your Input:**
+```json
+{
+  "guests_count": 4,
+  "number_of_adults": 2,
+  "number_of_children": 1,
+  "number_of_infants": 1,
+  "number_of_pets": 0
+}
+```
+
+**Sent to Guesty API:**
+```json
+{
+  "guestsCount": 4,
+  "numberOfGuests": {
+    "numberOfAdults": 2,
+    "numberOfChildren": 1,
+    "numberOfInfants": 1
+    // numberOfPets omitted since it's 0
+  }
+}
+```
 
 ## Request Examples
 
@@ -94,28 +126,26 @@ If `number_of_adults` is not provided, it defaults to the full `guests_count`.
 ```json
 {
   "success": true,
-  "quote_id": "local_quote_id_123",
   "guesty_quote": {
     "id": "guesty_quote_id",
     "_id": "guesty_internal_id",
+    "numberOfGuests": {
+      "numberOfAdults": 2,
+      "numberOfChildren": 1,
+      "numberOfInfants": 1
+    },
     "pricing": {
       "total": 500.00,
-      "currency": "USD"
-    }
-  },
-  "database_record": {
-    "quote_id": "local_quote_id_123",
-    "check_in_date_localized": "2025-07-15",
-    "check_out_date_localized": "2025-07-20",
-    "listing_id": "abc123",
-    "source": "website",
-    "guests_count": 4,
-    "number_of_adults": 2,
-    "number_of_children": 1,
-    "number_of_infants": 1,
-    "number_of_pets": 1,
-    "guesty_quote_id": "guesty_internal_id",
-    "created_at": "2025-07-01T10:00:00Z"
+      "currency": "USD",
+      "basePrice": 400.00,
+      "cleaningFee": 50.00,
+      "serviceFee": 30.00,
+      "taxes": 20.00
+    },
+    "checkInDateLocalized": "2025-07-15",
+    "checkOutDateLocalized": "2025-07-20",
+    "listingId": "abc123",
+    "guestsCount": 4
   }
 }
 ```
@@ -182,23 +212,48 @@ If `number_of_adults` is not provided, it defaults to the full `guests_count`.
 - All required fields must be present and non-empty
 - String fields cannot be empty or null
 
-## CORS Support
+## Features
 
-The function includes comprehensive CORS headers to support cross-origin requests:
+- **Comprehensive Guest Breakdown**: Supports detailed guest composition (adults, children, infants, pets)
+- **Smart Field Optimization**: Only sends non-zero guest breakdown values to the API
+- **Flexible Input Validation**: Validates guest totals only when detailed breakdown is provided
+- **Proper API Structure**: Transforms flat input into Guesty's required nested `numberOfGuests` format
+- **Comprehensive Error Handling**: Detailed validation and error reporting
+- **CORS Support**: Full cross-origin request support
+- **Debug Logging**: Request/response logging for troubleshooting
 
+## Debugging
+
+The function includes comprehensive logging to help troubleshoot issues:
+
+```javascript
+// Logs the exact request being sent to Guesty API
+console.log("Sending to Guesty API:", JSON.stringify(guestyQuoteRequest, null, 2));
+
+// Logs the response received from Guesty API  
+console.log("Guesty API response:", JSON.stringify(guestyData, null, 2));
 ```
-Access-Control-Allow-Origin: *
-Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS
-Access-Control-Allow-Headers: authorization, x-client-info, apikey, content-type, x-requested-with, accept, origin, referer, user-agent
-```
+
+Check your function logs to see the actual request/response data when troubleshooting.
 
 ## Database Integration
 
-The function stores quote information in the `quotes` table with the following fields:
-- Local quote tracking information
-- Guest breakdown details
-- Guesty quote ID for reference
-- Request parameters for audit trail
+The function currently does not store quote information in the local database. It only interacts with the Guesty API to create quotes and returns the response directly to the client.
+
+## Architecture
+
+```
+Client Request → Edge Function → Guesty API → Response to Client
+      ↓              ↓              ↓
+  Validation   Transform to    Return Quote
+  & Cleanup    Nested Format      Data
+```
+
+The function acts as a smart proxy that:
+1. Validates and cleans input data
+2. Transforms flat guest data into Guesty's nested format
+3. Optimizes the request by excluding zero values
+4. Returns the complete quote response
 
 ## Guesty API Integration
 
@@ -207,7 +262,29 @@ The function communicates with the Guesty API at:
 POST https://open-api.guesty.com/v1/quotes
 ```
 
-The request includes detailed guest breakdown information as required by the Guesty API specification.
+The request includes detailed guest breakdown information nested under the `numberOfGuests` object as required by the Guesty API specification:
+
+```json
+{
+  "listingId": "abc123",
+  "checkInDateLocalized": "2025-07-15",
+  "checkOutDateLocalized": "2025-07-20",
+  "guestsCount": 4,
+  "numberOfGuests": {
+    "numberOfAdults": 2,
+    "numberOfChildren": 1,
+    "numberOfInfants": 1,
+    "numberOfPets": 1
+  },
+  "source": "website",
+  "ignoreCalendar": false,
+  "ignoreTerms": false,
+  "ignoreBlocks": false,
+  "couponCode": "SUMMER25"
+}
+```
+
+**Note**: Only non-zero guest breakdown fields are included in the `numberOfGuests` object to optimize the request payload.
 
 ## Local Development
 
@@ -272,3 +349,6 @@ All errors are returned with appropriate HTTP status codes and descriptive error
 - **v1.0.0**: Initial implementation with basic quote creation
 - **v1.1.0**: Added detailed guest breakdown support (adults, children, infants, pets)
 - **v1.1.1**: Enhanced validation and error handling
+- **v1.2.0**: Fixed guest breakdown structure to use nested `numberOfGuests` object
+- **v1.2.1**: Added smart field optimization (only send non-zero values)
+- **v1.2.2**: Added comprehensive debugging and logging
