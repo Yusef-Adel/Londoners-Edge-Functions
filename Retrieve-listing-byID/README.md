@@ -28,65 +28,150 @@ This Supabase Edge Function retrieves comprehensive listing data from the Guesty
 
 ### Success Response (200)
 
-```json
-{
-  "success": true,
-  "data": {
-    "id": "679b2773da32a800107fc7c0",
-    "title": "Diana's Hidden Gem",
-    "description": "Discover a chic, brand-new studio in the heart of Central London...",
-    "location": {
-      "city": "Greater London",
-      "country": "United Kingdom",
-      "address": "Devonshire Place, W1G 6HY Greater London, United Kingdom",
-      "neighborhood": "Marylebone",
-      "coordinates": {
-        "lat": 51.5227443,
-        "lng": -0.1500186
-      },
-      "zipcode": "W1G 6HY",
-      "state": "England",
-      "timeZone": "Europe/London"
-    },
-    "pricing": {
-      "basePrice": 200,
-      "currency": "GBP",
-      "cleaningFee": 100,
-      "serviceFee": 0,
-      "securityDeposit": 0
-    },
-    "capacity": {
-      "bedrooms": 0,
-      "bathrooms": 1,
-      "beds": 2,
-      "guests": 3
-    },
-    "amenities": [
-      "Air conditioning",
-      "Wifi",
-      "Kitchen",
-      "Parking"
-    ],
-    "pictures": [
+```
+[
+  {
+    "MaxNumofGuests": "3",
+    "PricePerNight": "200",
+    "whatsup": "+447425114904",
+    "Cleaningfee": "100",
+    "Servicefee": "0",
+    "reviews": "4.8",
+    "numReviews": "156",
+    "minNights": "2",
+    "defaultCheckInTime": "16:00",
+    "defaultCheckOutTime": "11:00",
+    "bedrooms": 0,
+    "bathrooms": 1,
+    "beds": 2,
+    "guests": 3,
+    "bookingWindow": { "defaultSettings": { "days": -1 }, "updatedAt": "2025-05-19T08:56:59.114Z", "updatedBy": "EdgeFunction" },
+    "preparationTime": { "defaultSettings": { "days": 0 }, "updatedAt": "2025-05-19T08:56:59.114Z", "updatedBy": "EdgeFunction" },
+    "weekendDays": ["Saturday", "Sunday"],
+    "imagesDummy": [
       "https://assets.guesty.com/image/upload/...",
       "https://assets.guesty.com/image/upload/..."
-    ],
-    "ratings": {
+    ]
+  },
+  {
+    "dummyPropertyData": {
       "rating": 4.8,
-      "reviewCount": 156
-    },
-    "checkInOut": {
-      "checkInTime": "16:00",
-      "checkOutTime": "11:00"
-    },
-    "host": {
-      "name": "John Doe",
-      "phone": "+447425114904"
-    },
-    "policies": {
-      "cancellationPolicy": "Flexible",
-      "houseRules": ["No smoking", "No pets"]
-    },
+      "reviewCount": 156,
+      "location": "Greater London, United Kingdom",
+      "description": [
+        "Discover a chic, brand-new studio in the heart of Central London...",
+        "Marylebone neighborhood, close to transport"
+      ],
+      "amenities": [
+        { "icon": "Wifi", "name": "Fast wifi", "description": "Download speeds of 100+ Mbps" },
+        { "icon": "Tv", "name": "Self check-in", "description": "Check yourself in with the smartlock" },
+        { "icon": "AirVent", "name": "Air Conditioning", "description": "Air conditioning throughout the entire place" }
+      ]
+    }
+  },
+  {
+    "amenityData": [
+      { "icon": "Wifi", "name": "Wifi" },
+      { "icon": "AirVent", "name": "Air conditioning" },
+      { "icon": "Utensils", "name": "Kitchen" },
+      { "icon": "Parking", "name": "Parking" }
+    ]
+  },
+  {
+    "transportData": [
+      { "name": "Regent's Park Station (5-7 minute)", "icon": "/placeholder.svg?height=32&width=32&text=TFL", "alt": "London Underground" },
+      { "name": "Baker Street Station (5-7 minute)", "icon": "/placeholder.svg?height=32&width=32&text=TFL", "alt": "London Underground" }
+    ]
+  },
+  {
+    "roomData": [
+      { "image": "/bd1.png", "alt": "Bedroom 1", "name": "Bedroom 1", "description": "1 queen bed", "hasBed": true },
+      { "image": "/bd1.png", "alt": "Living Room", "name": "Living Room", "description": "Spacious common area", "hasBed": false }
+    ]
+  },
+  {
+    "propertyReviews": {
+      "ratingSummary": {
+        "average": 4.8,
+        "count": 156,
+        "stars": 5,
+        "ratingBars": [
+          { "label": "5 star", "percentage": 85 },
+          { "label": "4 star", "percentage": 60 },
+          { "label": "3 star", "percentage": 35 },
+          { "label": "2 star", "percentage": 10 },
+          { "label": "1 star", "percentage": 5 }
+        ],
+        "categories": [
+          { "label": "Cleanliness", "rating": 4.7 },
+          { "label": "Accuracy", "rating": 4.6 },
+          { "label": "Check-In", "rating": 4.8 },
+          { "label": "Communication", "rating": 4.9 },
+          { "label": "Location", "rating": 4.8 },
+          { "label": "Value", "rating": 4.5 }
+        ]
+      },
+      "reviews": [
+        {
+          "id": 1,
+          "user": { "name": "Mary William", "initials": "MW", "avatar": "/placeholder.svg?height=40&width=40&text=MW" },
+          "rating": 4.6,
+          "date": "2025-07-01",
+          "content": "Perfect base for exploring London...",
+          "fullContent": "Perfect base for exploring London. Family of five fitted comfortably. Immaculately clean. Easy walk to multiple tube stations. Nice neighborhood and quiet street with very little traffic. Easy to find."
+        }
+      ]
+    }
+  },
+  {
+    "dummyLocationData": {
+      "title": "Where you'll be",
+      "description": "Marylebone, known for its charm and convenience.",
+      "coordinates": "51.5227443,-0.1500186",
+      "neighborhood": "Marylebone",
+      "walkingDistances": [
+        "5 min walk to transport",
+        "10 min walk to city center",
+        "15 min walk to shopping",
+        "20 min walk to attractions",
+        "25 min walk to dining"
+      ]
+    }
+  },
+  {
+    "dummyThingsToKnowData": {
+      "title": "Things to know",
+      "sections": [
+        {
+          "title": "House Rules",
+          "items": [
+            "Check-in after 16:00",
+            "Checkout before 11:00",
+            "3 guests maximum"
+          ],
+          "hasButton": true
+        },
+        {
+          "title": "Safety & Property",
+          "items": [
+            "Carbon monoxide alarm",
+            "Smoke alarm",
+            "Security camera/recording device"
+          ],
+          "hasButton": true
+        },
+        {
+          "title": "Cancellation Policy",
+          "items": [
+            "Flexible"
+          ],
+          "hasButton": true,
+          "isParagraph": true
+        }
+      ]
+    }
+  },
+  {
     "rates": [
       {
         "platform": "bookingCom",
@@ -97,36 +182,25 @@ This Supabase Edge Function retrieves comprehensive listing data from the Guesty
         "currency": "GBP",
         "hotelId": 9849029
       }
-    ],
-    "propertyType": "Serviced apartment",
-    "roomType": "Entire home/apt",
-    "listingType": "short_term_rental",
-    "accommodates": 3,
-    "publicDescription": {
-      "summary": "...",
-      "space": "...",
-      "neighborhood": "...",
-      "transit": "...",
-      "notes": "...",
-      "houseRules": "..."
-    },
-    "amenitiesNotIncluded": [],
-    "taxes": [],
-    "defaultCheckInTime": "16:00",
-    "defaultCheckOutTime": "11:00",
-    "isListed": true,
-    "active": true,
-    "integrations": [...],
-    "nickname": "17A1 Devonshre Place",
-    "accountId": "679a424e85f74b5fe968cec2",
-    "createdAt": "2025-01-30T07:17:07.766Z",
-    "lastUpdatedAt": "2025-05-19T08:56:59.114Z",
-    "customFields": [...]
+    ]
+  },
+  {
+    "dummyNearby": [
+      { "id": 1, "imageUrl": "/dt2.png", "title": "Nearby Property 1", "rating": 4.9, "reviewCount": 42, "details": { "beds": 2, "baths": 1, "kitchens": 1 } },
+      { "id": 2, "imageUrl": "/dt2.png", "title": "Nearby Property 2", "rating": 4.8, "reviewCount": 36, "details": { "beds": 1, "baths": 1, "kitchens": 1 } },
+      { "id": 3, "imageUrl": "/dt2.png", "title": "Nearby Property 3", "rating": 4.7, "reviewCount": 28, "details": { "beds": 3, "baths": 2, "kitchens": 1 } }
+    ]
   }
-}
+]
 ```
 
-### Error Responses
+> **Note:**
+> - The response is an array of objects, each representing a section of the listing data.
+> - Ratings, review counts, and review content are always sourced from your review system (get-review edge function).
+> - Bedrooms, beds, bathrooms, and guests are always sourced from the Guesty API.
+> - The structure and field names match the actual function output for frontend consumption.
+
+## Error Responses
 
 #### 400 - Bad Request
 ```json
@@ -224,7 +298,7 @@ curl -i --location --request POST 'https://your-project.supabase.co/functions/v1
 
 ```powershell
 curl.exe -i --location --request POST 'http://127.0.0.1:54321/functions/v1/Retrieve-listing-byID' `
-  --header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0' `
+  --header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9zZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0' `
   --header 'Content-Type: application/json' `
   --data '{"id":"679b2773da32a800107fc7c0"}'
 ```
