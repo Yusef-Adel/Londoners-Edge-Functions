@@ -1,10 +1,26 @@
 # Listing Search Edge Function
 
-A Supabase Edge Function that interfaces with the Guesty API to search and retrieve property listings with advanced filtering capabilities.
+This Supabase Edge Function searches Guesty listings and returns structured property data, including accurate property details and real review/rating data from your review system.
 
-## Overview
+## Features
 
-This function provides a comprehensive search interface for Guesty property listings, transforming the raw API data into a structured format suitable for frontend applications. It supports various search parameters including availability dates, occupancy requirements, location filters, and more.
+- **Accurate property details**: Returns correct values for bedrooms, beds, bathrooms, and guests using Guesty API fields.
+- **Real review/rating integration**: Calls the `get-review` edge function for each listing to return:
+  - `rating`: The real overall average rating from your review system
+  - `reviews`: The real number of reviews (from review API, not Guesty stats)
+- **Rich property data**: Includes title, location, area, price, images, amenities, and more.
+- **Pagination and filtering**: Supports search, city, occupancy, and more.
+- **CORS support**: Handles cross-origin requests.
+- **Error handling**: Proper error responses for missing data or failed API calls.
+
+## Setup
+
+1. **Database Requirements**:
+   - A table called `guesty_tokens` with a column:
+     - `access_token` (TEXT)
+
+2. **Review Edge Function**:
+   - The function calls `https://oaumvyuwtzuyhkwzzxtb.supabase.co/functions/v1/get-review` for each listing, passing the listing ID and using the Supabase service role key for authentication.
 
 ## API Endpoint
 
@@ -365,3 +381,36 @@ The Guesty API may have rate limits. If you encounter rate limiting:
 1. Implement request delays in your application
 2. Use pagination to reduce large requests
 3. Cache results when possible
+
+## Error Responses
+
+### 400 - Bad Request
+```json
+{
+  "status": "error",
+  "message": "Missing required parameters"
+}
+```
+
+### 500 - Internal Server Error
+```json
+{
+  "status": "error",
+  "message": "Internal server error",
+  "details": "..."
+}
+```
+
+## Testing
+
+You can test the function using curl:
+
+```bash
+curl -i --location --request POST 'https://YOUR_PROJECT.supabase.co/functions/v1/listing-search' \
+  --header 'Content-Type: application/json' \
+  --data-raw '{"q":"beach","limit":10}'
+```
+
+## Notes
+- The function always returns the most accurate and up-to-date property and review data by combining Guesty and your review system.
+- The Authorization header is not required for the client; the function handles Guesty and review API authentication internally.
