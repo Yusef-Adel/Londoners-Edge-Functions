@@ -4,7 +4,38 @@ A Supabase Edge Function for retrieving reviews and ratings statistics for prope
 
 ## Overview
 
-This function allows you to fetch reviews for a specific property listing with comprehensive statistics including overall ratings, category-specific averages, rating distributions, and pagination support. It provides both individual review details and aggregated statistics in a single response.
+This function allows you to fetch reviews for a specific property listing with comprehensive statistics including overall ratings, category-specific averages, rating distributions, and pagination support. It provides both individual review details and aggregated statistics in a single response. Each review includes the guest's full name and a profile picture (from Guesty if available, otherwise a default placeholder image).
+
+## Database Schema
+
+The function reads from two main tables:
+
+### `reviews` Table
+```sql
+CREATE TABLE reviews (
+  review_id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+  listing_id TEXT,
+  guest_id TEXT,
+  review_text TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  overall_rating FLOAT
+);
+```
+
+### `review_ratings` Table
+```sql
+CREATE TABLE review_ratings (
+  rating_id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+  review_id BIGINT,
+  cleanliness FLOAT,
+  accuracy FLOAT,
+  check_in FLOAT,
+  communication FLOAT,
+  location FLOAT,
+  value FLOAT,
+  FOREIGN KEY (review_id) REFERENCES reviews (review_id)
+);
+```
 
 ## API Specification
 
@@ -89,6 +120,8 @@ Content-Type: application/json (for POST requests only)
       {
         "review_id": 1,
         "guest_id": "guest_456",
+        "guest_name": "John Smith",
+        "guest_picture": "https://res.cloudinary.com/guesty/image/upload/...", // or placeholder if not available
         "review_text": "Perfect base for exploring London...",
         "overall_rating": 4.5,
         "created_at": "2025-07-01T10:30:00Z",
@@ -124,6 +157,8 @@ Content-Type: application/json (for POST requests only)
 #### Individual Review Object
 - `review_id`: Unique review identifier
 - `guest_id`: ID of the guest who left the review
+- `guest_name`: Full name of the guest (from Guesty, or "Anonymous Guest")
+- `guest_picture`: URL to the guest's profile picture (from Guesty if available, otherwise a default placeholder: `https://img.icons8.com/?size=100&id=23264&format=png&color=000000`)
 - `review_text`: Written review content
 - `overall_rating`: Calculated overall rating (average of all categories)
 - `created_at`: ISO timestamp when review was created
@@ -199,6 +234,7 @@ Content-Type: application/json (for POST requests only)
 - Individual category breakdowns
 - Guest information and timestamps
 - Calculated overall ratings
+- **Guest profile picture**: Always included, either from Guesty or a default placeholder
 
 ## Usage Examples
 
