@@ -1,10 +1,10 @@
 # Get Reservations Edge Function
 
-This Supabase Edge Function retrieves reservations from the Guesty API with support for filtering, pagination, and field selection.
+This Supabase Edge Function retrieves reservations from the Guesty API with support for filtering, pagination, field selection, and automatic type categorization.
 
 ## Overview
 
-The function integrates with Guesty's Open API to fetch reservation data. It automatically handles authentication using tokens stored in your Supabase database and supports various filtering options including guest-specific queries.
+The function integrates with Guesty's Open API to fetch reservation data. It automatically handles authentication using tokens stored in your Supabase database and supports various filtering options including guest-specific queries. All reservations are automatically categorized by type (previous, current, upcoming) based on their check-in and check-out dates.
 
 ## Features
 
@@ -12,6 +12,8 @@ The function integrates with Guesty's Open API to fetch reservation data. It aut
 - ✅ **Token Management**: Automatic retrieval of valid Guesty tokens from database
 - ✅ **Flexible Filtering**: Support for MongoDB-style operators (`$eq`, `$not`, `$contains`, `$between`, etc.)
 - ✅ **Guest Filtering**: Easy filtering by specific guest ID
+- ✅ **Automatic Type Categorization**: All reservations include type classification (previous, current, upcoming)
+- ✅ **Summary Statistics**: Response includes counts for each reservation type
 - ✅ **Pagination**: Built-in pagination support with configurable limits
 - ✅ **Field Selection**: Choose specific fields to return
 - ✅ **Sorting**: Customizable result sorting
@@ -65,6 +67,16 @@ When using the `filters` parameter, each filter object should follow this struct
 - `$lt` - Less than
 - `$between` - Between two values (requires `from` and `to` instead of `value`)
 
+## Reservation Types
+
+All reservations automatically include a `type` field that categorizes them based on current date:
+
+- **previous**: Reservations where checkout date is in the past
+- **current**: Reservations where current date is between checkin and checkout
+- **upcoming**: Reservations where checkin date is in the future
+
+The response also includes a summary object with counts for each type.
+
 ### Date Range Filter Example
 
 For date ranges using `$between`:
@@ -80,7 +92,7 @@ For date ranges using `$between`:
 
 ## Usage Examples
 
-### 1. Get All Reservations (Default)
+### 1. Get All Reservations with Types (Default)
 
 ```bash
 curl -X POST 'https://your-project.supabase.co/functions/v1/get-reservations' \
@@ -170,6 +182,7 @@ curl -X POST 'https://your-project.supabase.co/functions/v1/get-reservations' \
       "confirmationCode": "BC-l05nYJZ37",
       "checkIn": "2025-07-19T15:00:00.000Z",
       "checkOut": "2025-07-27T10:00:00.000Z",
+      "type": "upcoming",
       "guest": {
         "_id": "683743a880b8e714e775353b",
         "fullName": "AHMED ESSAM A ALMAHDY"
@@ -188,7 +201,13 @@ curl -X POST 'https://your-project.supabase.co/functions/v1/get-reservations' \
       }
     }
   ],
-  "totalCount": 1,
+  "summary": {
+    "previous": 12,
+    "current": 3,
+    "upcoming": 8,
+    "total": 23
+  },
+  "totalCount": 23,
   "page": 1,
   "limit": 25
 }
@@ -216,10 +235,22 @@ Each reservation object in the `data` array contains:
 | `confirmationCode` | string | Booking confirmation code |
 | `checkIn` | string | Check-in date (ISO format) |
 | `checkOut` | string | Check-out date (ISO format) |
+| `type` | string | Reservation type (previous, current, upcoming) |
 | `guest` | object | Guest information (name, etc.) |
 | `listing` | object | Property information (title, etc.) |
 | `integration` | object | Platform information (Airbnb, Booking.com, etc.) |
 | `accounting` | object | Financial information including commission |
+
+### Summary Object
+
+The response includes a `summary` object with reservation counts:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `previous` | number | Count of previous reservations (checkout in past) |
+| `current` | number | Count of current reservations (currently staying) |
+| `upcoming` | number | Count of upcoming reservations (checkin in future) |
+| `total` | number | Total count of all reservations |
 
 ## Prerequisites
 
@@ -278,11 +309,11 @@ supabase functions deploy get-reservations
 
 ## Common Use Cases
 
-1. **Guest Dashboard**: Show all reservations for a specific guest
-2. **Property Management**: Filter reservations by date range or status
-3. **Reporting**: Extract reservation data for analytics
-4. **Booking Management**: Monitor recent bookings and check-ins
-5. **Commission Tracking**: Access financial data for revenue analysis
+1. **Guest Dashboard**: Show all reservations for a specific guest with type categorization
+2. **Property Management**: Filter reservations by date range or status with automatic type labels
+3. **Reporting**: Extract reservation data for analytics with summary statistics
+4. **Booking Management**: Monitor recent bookings and check-ins with type-based organization
+5. **Commission Tracking**: Access financial data for revenue analysis grouped by reservation type
 
 ## Troubleshooting
 
