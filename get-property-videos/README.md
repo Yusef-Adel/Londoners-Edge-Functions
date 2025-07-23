@@ -121,20 +121,7 @@ videos = response.json()
 - ✅ **Error Handling**: Comprehensive error responses
 - ✅ **JSON Parsing**: Safe JSON parsing with error handling
 
-## Database Schema
 
-The function queries the `listing_video` table with the following expected structure:
-
-```sql
-CREATE TABLE listing_video (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  listing_id TEXT NOT NULL,
-  video_url TEXT,
-  video_title TEXT,
-  video_description TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
 ```
 
 ## Environment Variables
