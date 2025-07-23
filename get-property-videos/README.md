@@ -32,8 +32,6 @@ Requires a valid Authorization header with a Bearer token.
     "id": "uuid",
     "listing_id": "string",
     "video_url": "string",
-    "video_title": "string",
-    "video_description": "string",
     "created_at": "timestamp",
     "updated_at": "timestamp"
   }
