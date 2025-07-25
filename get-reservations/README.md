@@ -1,10 +1,10 @@
 # Get Reservations Edge Function
 
-This Supabase Edge Function retrieves reservations from the Guesty API with support for filtering, pagination, field selection, and automatic type categorization.
+This Supabase Edge Function retrieves and formats reservation data from the Guesty API with support for filtering, pagination, field selection, and automatic type categorization. The function returns structured, human-readable reservation data optimized for frontend display.
 
 ## Overview
 
-The function integrates with Guesty's Open API to fetch reservation data. It automatically handles authentication using tokens stored in your Supabase database and supports various filtering options including guest-specific queries. All reservations are automatically categorized by type (previous, current, upcoming) based on their check-in and check-out dates.
+The function integrates with Guesty's Open API to fetch reservation data and transforms it into a clean, formatted structure. It automatically handles authentication using tokens stored in your Supabase database and supports various filtering options including guest-specific queries. All reservations are automatically categorized by type (previous, current, upcoming) based on their check-in and check-out dates, with user-friendly date and amount formatting.
 
 ## Features
 
@@ -13,10 +13,12 @@ The function integrates with Guesty's Open API to fetch reservation data. It aut
 - ✅ **Flexible Filtering**: Support for MongoDB-style operators (`$eq`, `$not`, `$contains`, `$between`, etc.)
 - ✅ **Guest Filtering**: Easy filtering by specific guest ID
 - ✅ **Automatic Type Categorization**: All reservations include type classification (previous, current, upcoming)
+- ✅ **Human-Readable Formatting**: Dates formatted as "20 Jul 2025, 15:00" and amounts as "$1760"
 - ✅ **Summary Statistics**: Response includes counts for each reservation type
 - ✅ **Pagination**: Built-in pagination support with configurable limits
 - ✅ **Field Selection**: Choose specific fields to return
 - ✅ **Sorting**: Customizable result sorting
+- ✅ **Frontend-Optimized**: Clean data structure ready for UI display
 - ✅ **CORS Support**: Ready for frontend integration
 
 ## API Endpoint
@@ -176,40 +178,26 @@ curl -X POST 'https://your-project.supabase.co/functions/v1/get-reservations' \
   "message": "Reservations retrieved successfully",
   "data": [
     {
-      "_id": "683743a9f0cd830030cd117a",
-      "guestId": "683743a880b8e714e775353b",
-      "listingId": "679b0ea4cb8d6900130ed2c5",
-      "confirmationCode": "BC-l05nYJZ37",
-      "checkIn": "2025-07-19T15:00:00.000Z",
-      "checkOut": "2025-07-27T10:00:00.000Z",
-      "type": "upcoming",
-      "guest": {
-        "_id": "683743a880b8e714e775353b",
-        "fullName": "AHMED ESSAM A ALMAHDY"
-      },
-      "listing": {
-        "_id": "679b0ea4cb8d6900130ed2c5",
-        "title": "Its South Ken, Darling!"
-      },
-      "integration": {
-        "platform": "bookingCom"
-      },
-      "accounting": {
-        "analytics": {
-          "commission": 851.73
-        }
-      }
+      "id": "HMQFTBDEXA",
+      "apartment": "Emperor's Lounge",
+      "guests": 1,
+      "checkIn": "20 Jul 2025, 15:00",
+      "checkOut": "25 Jul 2025, 10:00",
+      "amount": "$1760",
+      "status": "Unknown",
+      "type": "current"
     }
   ],
   "summary": {
-    "previous": 12,
-    "current": 3,
-    "upcoming": 8,
-    "total": 23
+    "previous": 0,
+    "current": 1,
+    "upcoming": 0,
+    "total": 1
   },
-  "totalCount": 23,
+  "totalCount": 1,
   "page": 1,
-  "limit": 25
+  "limit": 25,
+  "isEmpty": false
 }
 ```
 
@@ -229,17 +217,23 @@ Each reservation object in the `data` array contains:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `_id` | string | Unique reservation ID |
-| `guestId` | string | Guest identifier |
-| `listingId` | string | Property listing identifier |
-| `confirmationCode` | string | Booking confirmation code |
-| `checkIn` | string | Check-in date (ISO format) |
-| `checkOut` | string | Check-out date (ISO format) |
+| `id` | string | Unique reservation/confirmation ID |
+| `apartment` | string | Property/apartment name |
+| `guests` | number | Number of guests for the reservation |
+| `checkIn` | string | Check-in date and time (formatted: "DD MMM YYYY, HH:MM") |
+| `checkOut` | string | Check-out date and time (formatted: "DD MMM YYYY, HH:MM") |
+| `amount` | string | Total reservation amount (formatted with currency symbol) |
+| `status` | string | Reservation status (e.g., "Unknown", "Confirmed", "Cancelled") |
 | `type` | string | Reservation type (previous, current, upcoming) |
-| `guest` | object | Guest information (name, etc.) |
-| `listing` | object | Property information (title, etc.) |
-| `integration` | object | Platform information (Airbnb, Booking.com, etc.) |
-| `accounting` | object | Financial information including commission |
+
+### Additional Response Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `totalCount` | number | Total number of reservations found |
+| `page` | number | Current page number |
+| `limit` | number | Number of records per page |
+| `isEmpty` | boolean | Whether the result set is empty |
 
 ### Summary Object
 
@@ -251,6 +245,12 @@ The response includes a `summary` object with reservation counts:
 | `current` | number | Count of current reservations (currently staying) |
 | `upcoming` | number | Count of upcoming reservations (checkin in future) |
 | `total` | number | Total count of all reservations |
+
+### Date and Amount Formatting
+
+- **Dates**: Formatted as human-readable strings (e.g., "20 Jul 2025, 15:00")
+- **Amounts**: Formatted with currency symbols (e.g., "$1760")
+- **Guest Count**: Simple numeric value representing number of guests
 
 ## Prerequisites
 
@@ -309,11 +309,13 @@ supabase functions deploy get-reservations
 
 ## Common Use Cases
 
-1. **Guest Dashboard**: Show all reservations for a specific guest with type categorization
+1. **Guest Dashboard**: Show all reservations for a specific guest with type categorization and formatted dates
 2. **Property Management**: Filter reservations by date range or status with automatic type labels
 3. **Reporting**: Extract reservation data for analytics with summary statistics
 4. **Booking Management**: Monitor recent bookings and check-ins with type-based organization
-5. **Commission Tracking**: Access financial data for revenue analysis grouped by reservation type
+5. **Frontend Display**: Use formatted data directly in UI components without additional processing
+6. **Mobile Apps**: Clean, structured data perfect for mobile reservation lists
+7. **Revenue Tracking**: Access formatted amount data for financial overview
 
 ## Troubleshooting
 
