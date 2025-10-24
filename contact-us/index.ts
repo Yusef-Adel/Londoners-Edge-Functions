@@ -6,7 +6,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 
 const SENDGRID_API_KEY = Deno.env.get('SENDGRID_API_KEY')
-const TO_EMAIL = "info@londoners.com"
+const FROM_EMAIL = "info@londoners.com"
+const LONDONERS_DOMAIN = "@londoners.com"
 
 console.log("Contact Us Functions!")
 
@@ -16,14 +17,33 @@ function isValidApiKeyFormat(key: string): boolean {
 }
 
 Deno.serve(async (req) => {
+  // CORS headers for all browsers
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Max-Age': '86400',
+  }
+
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { 
+      headers: corsHeaders,
+      status: 200 
+    })
+  }
+
   // Validate API key exists and has correct format
   if (!SENDGRID_API_KEY) {
     console.error("SendGrid API key not found in environment variables")
     return new Response(
       JSON.stringify({ error: "Server configuration error: Missing API key" }),
-      { 
+      {
         status: 500,
-        headers: { "Content-Type": "application/json" }
+        headers: { 
+          "Content-Type": "application/json",
+          ...corsHeaders
+        }
       }
     )
   }
@@ -34,7 +54,10 @@ Deno.serve(async (req) => {
       JSON.stringify({ error: "Server configuration error: Invalid API key format" }),
       { 
         status: 500,
-        headers: { "Content-Type": "application/json" }
+        headers: { 
+          "Content-Type": "application/json",
+          ...corsHeaders
+        }
       }
     )
   }
@@ -45,7 +68,10 @@ Deno.serve(async (req) => {
       JSON.stringify({ error: "Method not allowed" }),
       { 
         status: 405,
-        headers: { "Content-Type": "application/json" }
+        headers: { 
+          "Content-Type": "application/json",
+          ...corsHeaders
+        }
       }
     )
   }
@@ -58,70 +84,135 @@ Deno.serve(async (req) => {
       JSON.stringify({ error: "Invalid JSON" }),
       { 
         status: 400,
-        headers: { "Content-Type": "application/json" }
+        headers: { 
+          "Content-Type": "application/json",
+          ...corsHeaders
+        }
       }
     )
   }
 
-  const { name, email, message, subject } = body
+  const { name, email, message, subject, use, to, listing_URL } = body
 
-  // Validate required fields
-  if (!name || !email || !message) {
+  // Validate 'use' parameter
+  if (!use || (use !== 'support' && use !== 'review')) {
     return new Response(
-      JSON.stringify({ error: "Missing required fields: name, email, message" }),
+      JSON.stringify({ error: "Missing or invalid 'use' parameter. Must be 'support' or 'review'" }),
       { 
         status: 400,
-        headers: { "Content-Type": "application/json" }
+        headers: { 
+          "Content-Type": "application/json",
+          ...corsHeaders
+        }
       }
     )
   }
 
-  // Validate email format
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  if (!emailRegex.test(email)) {
-    return new Response(
-      JSON.stringify({ error: "Invalid email format" }),
-      { 
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      }
-    )
+  // Validate required fields based on use case
+  if (use === 'support') {
+    if (!name || !email || !message) {
+      return new Response(
+        JSON.stringify({ error: "Missing required fields for support: name, email, message" }),
+        { 
+          status: 400,
+          headers: { 
+            "Content-Type": "application/json",
+            ...corsHeaders
+          }
+        }
+      )
+    }
+  } else if (use === 'review') {
+    if (!to || !listing_URL) {
+      return new Response(
+        JSON.stringify({ error: "Missing required fields for review: to, listing_URL" }),
+        { 
+          status: 400,
+          headers: { 
+            "Content-Type": "application/json",
+            ...corsHeaders
+          }
+        }
+      )
+    }
+  }
+
+  // Validate email format if provided
+  if (email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid email format" }),
+        { 
+          status: 400,
+          headers: { 
+            "Content-Type": "application/json",
+            ...corsHeaders
+          }
+        }
+      )
+    }
+  }
+
+  // Determine recipient email based on use case
+  let recipientEmail
+  
+  if (use === 'support') {
+    // Support emails always go to info@londoners.com
+    recipientEmail = FROM_EMAIL
+  } else if (use === 'review') {
+    // Review emails: send to the customer's actual email address
+    recipientEmail = to
+  }
+
+  // Prepare content based on use case
+  let emailContent
+  let emailSubject
+
+  if (use === 'support') {
+    emailSubject = subject || `Support Request from ${name}`
+    emailContent = `Hello, this is ${name}. My Email address is ${email}.\n\n${message}`
+  } else if (use === 'review') {
+    emailSubject = subject || "Thank you for your Review"
+    emailContent = `Thank you for your Review on this listing ${listing_URL}`
   }
 
   // Prepare email data for SendGrid
   const emailData = {
     personalizations: [
       {
-        to: [{ email: TO_EMAIL }],
-        subject: subject || `Contact Form Message from ${name}`
+        to: [{ email: recipientEmail }],
+        subject: emailSubject
       }
     ],
-    from: { email: TO_EMAIL },
-    reply_to: { email: email },
+    from: { email: FROM_EMAIL },
+    reply_to: email ? { email: email } : undefined,
     content: [
       {
         type: "text/plain",
-        value: `Name: ${name}\nEmail: ${email}\nMessage:\n\n${message}`
-      },
-      {
-        type: "text/html",
-        value: `
-          <h3>New Contact Form Message</h3>
-          <p><strong>Name:</strong> ${name}</p>
-          <p><strong>Email:</strong> ${email}</p>
-          <p><strong>Message:</strong></p>
-          <p>${message.replace(/\n/g, '<br>')}</p>
-        `
+        value: emailContent
       }
     ]
   }
 
   try {
-    // Log the request for debugging
-    console.log("Sending email via SendGrid API...")
-    console.log("To:", TO_EMAIL)
-    console.log("From:", email)
-    console.log("Subject:", subject || `Contact Form Message from ${name}`)
+    // Log the complete email details for debugging
+    console.log("=".repeat(60))
+    console.log("📧 EMAIL DEBUG INFO")
+    console.log("=".repeat(60))
+    console.log("Use case:", use)
+    console.log("To:", recipientEmail)
+    console.log("From:", FROM_EMAIL)
+    console.log("Reply-To:", email || "None")
+    console.log("Subject:", emailSubject)
+    console.log("-".repeat(60))
+    console.log("📝 EMAIL CONTENT:")
+    console.log("-".repeat(60))
+    console.log(emailContent)
+    console.log("=".repeat(60))
+    console.log("📦 FULL SENDGRID PAYLOAD:")
+    console.log(JSON.stringify(emailData, null, 2))
+    console.log("=".repeat(60))
     
     // Send email via SendGrid API
     const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
@@ -175,20 +266,27 @@ Deno.serve(async (req) => {
       }),
       { 
         status: 200,
-        headers: { "Content-Type": "application/json" }
+        headers: { 
+          "Content-Type": "application/json",
+          ...corsHeaders
+        }
       }
     )
 
   } catch (error) {
     console.error("Error sending email:", error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     return new Response(
       JSON.stringify({ 
         error: "Failed to send email",
-        details: error.message
+        details: errorMessage
       }),
       { 
         status: 500,
-        headers: { "Content-Type": "application/json" }
+        headers: { 
+          "Content-Type": "application/json",
+          ...corsHeaders
+        }
       }
     )
   }
@@ -199,17 +297,50 @@ Deno.serve(async (req) => {
   1. Run `supabase start` (see: https://supabase.com/docs/reference/cli/supabase-start)
   2. Make an HTTP request:
 
+  Example 1: Support Use Case
   curl -i --location --request POST 'http://127.0.0.1:54321/functions/v1/contact-us' \
     --header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0' \
     --header 'Content-Type: application/json' \
-    --data '{"name":"John Doe","email":"john@example.com","message":"Hello, I would like to get in touch!","subject":"Contact Request"}'
+    --data '{
+      "use": "support",
+      "name": "John Doe",
+      "email": "john@example.com",
+      "message": "I need help with my booking",
+      "to": "support@anydomain.com",
+      "subject": "Support Request"
+    }'
 
-  Expected JSON body:
+  Example 2: Review Use Case
+  curl -i --location --request POST 'http://127.0.0.1:54321/functions/v1/contact-us' \
+    --header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0' \
+    --header 'Content-Type: application/json' \
+    --data '{
+      "use": "review",
+      "to": "customer@anydomain.com",
+      "listing_URL": "https://londoners.com/listings/123",
+      "subject": "Thank you for your review"
+    }'
+
+  Expected JSON body for SUPPORT:
   {
-    "name": "John Doe",
-    "email": "john@example.com", 
-    "message": "Your message here",
-    "subject": "Optional subject" // If not provided, defaults to "Contact Form Message from {name}"
+    "use": "support",              // Required: "support" or "review"
+    "name": "John Doe",            // Required for support
+    "email": "john@example.com",   // Required for support (customer's email)
+    "message": "Your message",     // Required for support
+    "subject": "Optional subject"  // Optional
   }
+
+  Expected JSON body for REVIEW:
+  {
+    "use": "review",                                  // Required: "support" or "review"
+    "to": "customer@anydomain.com",                  // Required (domain will be replaced with @londoners.com)
+    "listing_URL": "https://londoners.com/listing",  // Required for review
+    "subject": "Optional subject"                     // Optional
+  }
+
+  Notes:
+  - SUPPORT emails: Customer emails go TO info@londoners.com, customer's email becomes REPLY-TO
+  - REVIEW emails: Domain in 'to' is replaced with @londoners.com (e.g., customer@gmail.com → customer@londoners.com)
+  - From email is always "info@londoners.com"
 
 */
