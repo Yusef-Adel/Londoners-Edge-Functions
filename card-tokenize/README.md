@@ -26,10 +26,10 @@ Authorization: Bearer YOUR_SUPABASE_ANON_KEY
 {
   "listingId": "679b0ea4cb8d6900130ed2c5",
   "card": {
-    "number": "4054332827516075",
-    "exp_month": "12",
-    "exp_year": "2029",
-    "cvc": "437"
+    "number": "CARD-NUMBER",
+    "exp_month": "",
+    "exp_year": "",
+    "cvc": ""
   },
   "billing_details": {
     "name": "Bishoy Osama",
@@ -233,3 +233,4 @@ This function includes CORS headers to allow cross-origin requests from web appl
 - `Access-Control-Allow-Methods: POST, OPTIONS`
 
 Adjust the `Access-Control-Allow-Origin` header in production to restrict access to your specific domain.
+
