@@ -51,31 +51,63 @@ interface GuestyReservationRequest {
 }
 
 interface GuestyReservationResponse {
-  _id?: string;
-  reservationId?: string;
+  reservationId: string;
+  quoteId: string;
+  confirmationCode: string;
   status: string;
-  confirmationCode?: string;
-  // Other fields would be here
+  guestId: string;
+  numberOfGuests: {
+    numberOfChildren: number;
+    numberOfInfants: number;
+    numberOfPets: number;
+    numberOfAdults: number;
+  };
+  creationTime: string;
+  reservedExpiresAt: string;
+  checkInDate: string;
+  checkOutDate: string;
+  unitTypeId: string;
+  unitId: string;
+  source: string;
+  channel: string;
+  guestsCount: number;
+  creationInfo: object;
 }
 
 console.log("Create Reservation Function initialized");
 
+// CORS headers for all responses
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
+
 serve(async (req) => {
   try {
+    // Handle CORS preflight requests
+    if (req.method === 'OPTIONS') {
+      return new Response('ok', { headers: corsHeaders });
+    }
+
     // Only allow POST requests
     if (req.method !== "POST") {
       return new Response(JSON.stringify({ error: "Method not allowed" }), {
         status: 405,
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...corsHeaders
+        },
       });
-    }
-
-    // Get the authorization header from the request
+    }    // Get the authorization header from the request
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Missing authorization header" }), {
         status: 401,
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...corsHeaders
+        },
       });
     }
 
@@ -86,7 +118,10 @@ serve(async (req) => {
     if (!requestData.quoteId) {
       return new Response(JSON.stringify({ error: "Missing required field: quoteId" }), {
         status: 400,
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...corsHeaders
+        },
       });
     }
 
@@ -94,18 +129,23 @@ serve(async (req) => {
     if (!requestData.guestId && !requestData.guest) {
       return new Response(JSON.stringify({ error: "Either guestId or guest object is required" }), {
         status: 400,
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...corsHeaders
+        },
       });
     }
 
     // If guest object is provided, validate required fields
     if (requestData.guest) {
       const requiredGuestFields = ["firstName", "lastName", "phones", "email"];
-      for (const field of requiredGuestFields) {
-        if (!requestData.guest[field as keyof typeof requestData.guest]) {
+      for (const field of requiredGuestFields) {        if (!requestData.guest[field as keyof typeof requestData.guest]) {
           return new Response(JSON.stringify({ error: `Missing required guest field: ${field}` }), {
             status: 400,
-            headers: { "Content-Type": "application/json" },
+            headers: { 
+              "Content-Type": "application/json",
+              ...corsHeaders
+            },
           });
         }
       }
@@ -114,7 +154,10 @@ serve(async (req) => {
       if (!Array.isArray(requestData.guest.phones) || requestData.guest.phones.length === 0) {
         return new Response(JSON.stringify({ error: "Guest phones must be a non-empty array" }), {
           status: 400,
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            ...corsHeaders
+          },
         });
       }
     }
@@ -130,13 +173,14 @@ serve(async (req) => {
     const { data: tokenData, error: tokenError } = await supabase
       .from("guesty_tokens")
       .select("access_token")
-      .single();
-
-    if (tokenError || !tokenData?.access_token) {
+      .single();    if (tokenError || !tokenData?.access_token) {
       console.error("Error fetching Guesty token:", tokenError);
       return new Response(JSON.stringify({ error: "Failed to retrieve Guesty API token" }), {
         status: 500,
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...corsHeaders
+        },
       });
     }
 
@@ -145,9 +189,9 @@ serve(async (req) => {
     // Prepare the reservation request for Guesty API
     const guestyReservationRequest: GuestyReservationRequest = {
       quoteId: requestData.quoteId,
-      status: "confirmed", // Set status to confirmed as requested
+      status: "reserved", // Set status to reserved by default
       ratePlanId: requestData.ratePlanId,
-      reservedUntil: requestData.reservedUntil ?? -1, // Default to -1 (no limit)
+      reservedUntil: requestData.reservedUntil ?? 0.17, // Default to 10 minutes as per Guesty docs
       guestId: requestData.guestId,
       guest: requestData.guest,
       ignoreCalendar: requestData.ignoreCalendar,
@@ -173,34 +217,108 @@ serve(async (req) => {
 
     if (!reservationResponse.ok) {
       const errorText = await reservationResponse.text();
-      console.error("Guesty Reservation API error:", errorText);
-      return new Response(JSON.stringify({ 
+      console.error("Guesty Reservation API error:", errorText);      return new Response(JSON.stringify({ 
         error: `Guesty Reservation API error: ${reservationResponse.status}`, 
         details: errorText 
       }), {
         status: reservationResponse.status,
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...corsHeaders
+        },
       });
     }
 
     // Parse the reservation response
     const reservationData: GuestyReservationResponse = await reservationResponse.json();
     
-    console.log("Reservation created successfully:", JSON.stringify(reservationData));
+    console.log("Reservation created successfully:", JSON.stringify(reservationData));    // Insert the reservation data into the database
+    try {
+      const { data: insertedReservation, error: insertError } = await supabase
+        .from("reservations")
+        .insert({
+          reservation_id: reservationData.reservationId,
+          quote_id: reservationData.quoteId,
+          confirmation_code: reservationData.confirmationCode,
+          status: reservationData.status,
+          guest_id: reservationData.guestId,
+          number_of_children: reservationData.numberOfGuests.numberOfChildren,
+          number_of_infants: reservationData.numberOfGuests.numberOfInfants,
+          number_of_pets: reservationData.numberOfGuests.numberOfPets,
+          number_of_adults: reservationData.numberOfGuests.numberOfAdults,
+          creation_time: reservationData.creationTime,
+          reserved_expires_at: reservationData.reservedExpiresAt,
+          check_in_date: reservationData.checkInDate,
+          check_out_date: reservationData.checkOutDate,
+          unit_type_id: reservationData.unitTypeId,
+          unit_id: reservationData.unitId,
+          source: reservationData.source,
+          channel: reservationData.channel,
+          guests_count: reservationData.guestsCount,
+          creation_info: JSON.stringify(reservationData.creationInfo),
+          guesty_response: JSON.stringify(reservationData),
+          created_at: new Date().toISOString()
+        })
+        .select()
+        .single();
 
-    // Return success response
-    return new Response(
-      JSON.stringify({
-        success: true,
-        reservation: reservationData,
-        message: "Reservation created successfully with confirmed status"
-      }),
-      { 
-        status: 200,
-        headers: { "Content-Type": "application/json" } 
+      if (insertError) {
+        console.error("Error inserting reservation into database:", insertError);
+        // Return success for Guesty creation but note database issue
+        return new Response(
+          JSON.stringify({
+            success: true,
+            reservation: reservationData,
+            message: "Reservation created successfully with Guesty but failed to save to database",
+            databaseError: insertError.message
+          }),
+          { 
+            status: 200,
+            headers: { 
+              "Content-Type": "application/json",
+              ...corsHeaders
+            } 
+          }
+        );
       }
-    );
 
+      console.log("Reservation saved to database:", JSON.stringify(insertedReservation));
+
+      // Return success response with both Guesty and database data
+      return new Response(
+        JSON.stringify({
+          success: true,
+          reservation: reservationData,
+          databaseRecord: insertedReservation,
+          message: "Reservation created successfully and saved to database"
+        }),
+        { 
+          status: 200,
+          headers: { 
+            "Content-Type": "application/json",
+            ...corsHeaders
+          } 
+        }
+      );
+    } catch (dbError) {
+      console.error("Database insertion error:", dbError);
+      // Return success for Guesty creation but note database issue
+      return new Response(
+        JSON.stringify({
+          success: true,
+          reservation: reservationData,
+          message: "Reservation created successfully with Guesty but failed to save to database",
+          databaseError: dbError.message
+        }),
+        { 
+          status: 200,
+          headers: { 
+            "Content-Type": "application/json",
+            ...corsHeaders
+          } 
+        }
+      );
+    }
   } catch (error) {
     console.error("Unexpected error:", error);
     return new Response(
@@ -210,7 +328,10 @@ serve(async (req) => {
       }),
       { 
         status: 500, 
-        headers: { "Content-Type": "application/json" } 
+        headers: { 
+          "Content-Type": "application/json",
+          ...corsHeaders
+        } 
       },
     );
   }
@@ -229,7 +350,7 @@ serve(async (req) => {
     "quoteId": "your-quote-id-here",
     "guestId": "existing-guest-id",
     "ratePlanId": "optional-rate-plan-id",
-    "reservedUntil": -1,
+    "reservedUntil": 10,
     "ignoreCalendar": false,
     "ignoreTerms": false,
     "ignoreBlocks": false,
@@ -257,7 +378,7 @@ serve(async (req) => {
       }
     },
     "ratePlanId": "optional-rate-plan-id",
-    "reservedUntil": -1,
+    "reservedUntil": 10,
     "ignoreCalendar": false,
     "ignoreTerms": false,
     "ignoreBlocks": false,
