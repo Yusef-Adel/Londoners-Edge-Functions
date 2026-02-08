@@ -1,6 +1,102 @@
 # Listing Search Edge Function
 
+Search Guesty listings with powerful filtering, real reviews, and automatic pricing quotes.
+
+## TL;DR
+
+**POST** to `/functions/v1/listing-search` with JSON filters:
+
+```javascript
+// Price range
+{ "minPrice": 100, "maxPrice": 500 }
+
+// Property specs  
+{ "minBedrooms": 2, "maxBedrooms": 4, "minGuests": 4 }
+
+// With dates → gets pricing quotes automatically
+{ 
+  "available": { "checkIn": "2025-08-01", "checkOut": "2025-08-07" },
+  "guestsCount": 4,
+  "minPrice": 200,
+  "maxPrice": 600
+}
+```
+
+**Available Filters:** `minPrice`, `maxPrice`, `minBedrooms`, `maxBedrooms`, `minBathrooms`, `maxBathrooms`, `minGuests`, `maxGuests`, `minBeds`, `maxBeds`, `city`, `q`, `available`, `guestsCount`, `limit`, `skip`
+
+**How It Works:**
+```
+Your Request → Guesty API → Get Listings → Apply Min/Max Filters → Get Reviews → [If dates provided: Fetch Quotes] → Return Results
+```
+
+**Response Comparison:**
+
+| Without Dates | With Dates (checkIn/checkOut) |
+|---------------|-------------------------------|
+| Basic listing data | ✅ Basic listing data |
+| Reviews/ratings | ✅ Reviews/ratings |
+| Base price | ✅ Base price |
+| ❌ No quotes | ✅ **Detailed pricing quotes** |
+| ❌ No invoice breakdown | ✅ **Invoice items breakdown** |
+| ❌ No host payout | ✅ **Host payout amount** |
+
+---
+
 This Supabase Edge Function searches Guesty listings and returns structured property data, including accurate property details, real review/rating data from your review system, and **optional quote/pricing data** when dates are provided.
+
+## Quick Start
+
+```bash
+# Basic search - all listings
+curl -X POST 'http://127.0.0.1:54321/functions/v1/listing-search' \
+  -H 'Content-Type: application/json' \
+  -d '{}'
+
+# Filter by price range
+curl -X POST 'http://127.0.0.1:54321/functions/v1/listing-search' \
+  -H 'Content-Type: application/json' \
+  -d '{"minPrice": 100, "maxPrice": 500, "limit": 25}'
+
+# Filter by property attributes
+curl -X POST 'http://127.0.0.1:54321/functions/v1/listing-search' \
+  -H 'Content-Type: application/json' \
+  -d '{"minBedrooms": 2, "maxBedrooms": 4, "minGuests": 4, "limit": 25}'
+
+# Search with dates (includes pricing quotes)
+curl -X POST 'http://127.0.0.1:54321/functions/v1/listing-search' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "available": {"checkIn": "2025-08-01", "checkOut": "2025-08-07"},
+    "guestsCount": 4,
+    "minPrice": 200,
+    "maxPrice": 600,
+    "minBedrooms": 2,
+    "limit": 20
+  }'
+```
+
+## Table of Contents
+
+- [Features](#features)
+- [Setup](#setup)
+- [API Endpoint](#api-endpoint)
+- [Request Format](#request-format)
+- [Supported Parameters](#supported-parameters)
+  - [Filter Cheat Sheet](#filter-cheat-sheet)
+  - [Min/Max Range Filters](#minmax-range-filters)
+- [Common Search Scenarios](#common-search-scenarios)
+- [Response Format](#response-format)
+- [Usage Examples](#usage-examples)
+- [JavaScript/TypeScript Usage](#javascripttypescript-usage)
+- [Important Notes](#important-notes)
+  - [Filter Behavior Summary](#filter-behavior-summary)
+  - [Quote/Pricing Integration](#quotepricing-integration)
+- [Troubleshooting](#troubleshooting)
+- [Error Responses](#error-responses)
+- [Quick Reference Card](#quick-reference-card)
+  - [All Available Filters](#all-available-filters)
+  - [Response Structure](#response-structure)
+  - [Filter Examples Cheat Sheet](#filter-examples-cheat-sheet)
 
 ## Features
 
@@ -14,6 +110,12 @@ This Supabase Edge Function searches Guesty listings and returns structured prop
   - `guestsCount`: Number of guests for the quote
   - `numberOfGuests`: Breakdown (adults, children, infants, pets)
   - Quote `_id` for reference
+- **Min/Max Range Filters** (NEW): Filter listings by price range, bedrooms, bathrooms, guest capacity, and beds
+  - `minPrice`/`maxPrice`: Filter by nightly rate
+  - `minBedrooms`/`maxBedrooms`: Filter by bedroom count
+  - `minBathrooms`/`maxBathrooms`: Filter by bathroom count
+  - `minGuests`/`maxGuests`: Filter by guest capacity
+  - `minBeds`/`maxBeds`: Filter by bed count
 - **Rich property data**: Includes title, location, area, price, images, amenities, and more.
 - **Pagination and filtering**: Supports search, city, occupancy, and more.
 - **CORS support**: Handles cross-origin requests.
@@ -58,6 +160,22 @@ Send a POST request with a JSON body containing search parameters:
 
 ## Supported Parameters
 
+### Filter Cheat Sheet
+
+**Quick Reference - All Available Filters:**
+
+| Category | Filters | Example Values |
+|----------|---------|----------------|
+| **Price** | `minPrice`, `maxPrice` | `100`, `500` |
+| **Bedrooms** | `minBedrooms`, `maxBedrooms` | `2`, `4` |
+| **Bathrooms** | `minBathrooms`, `maxBathrooms` | `1`, `3` |
+| **Guests** | `minGuests`, `maxGuests` | `4`, `8` |
+| **Beds** | `minBeds`, `maxBeds` | `2`, `5` |
+| **Location** | `city`, `q` (search) | `"Miami"`, `"beach"` |
+| **Dates** | `available.checkIn`, `available.checkOut` | `"2025-08-01"` |
+| **Guest Count** | `guestsCount` | `4` |
+| **Pagination** | `limit`, `skip` | `25`, `0` |
+
 ### Basic Search Parameters
 
 | Parameter | Type | Description | Example |
@@ -78,6 +196,21 @@ Send a POST request with a JSON body containing search parameters:
 | `available.minOccupancy` | number | Minimum guest capacity | `2` |
 | `guestsCount` | number | Number of guests for quote pricing (used when dates provided) | `2` |
 | `ignoreFlexibleBlocks` | boolean | Include listings with flexible booking blocks | `false` |
+
+### Min/Max Range Filters
+
+| Parameter | Type | Description | Example |
+|-----------|------|-------------|---------|
+| `minPrice` | number | Minimum price per night (USD) | `100` |
+| `maxPrice` | number | Maximum price per night (USD) | `500` |
+| `minBedrooms` | number | Minimum number of bedrooms | `2` |
+| `maxBedrooms` | number | Maximum number of bedrooms | `4` |
+| `minBathrooms` | number | Minimum number of bathrooms | `1` |
+| `maxBathrooms` | number | Maximum number of bathrooms | `3` |
+| `minGuests` | number | Minimum guest capacity | `4` |
+| `maxGuests` | number | Maximum guest capacity | `8` |
+| `minBeds` | number | Minimum number of beds | `2` |
+| `maxBeds` | number | Maximum number of beds | `5` |
 
 ### Status Filters
 
@@ -108,6 +241,74 @@ Send a POST request with a JSON body containing search parameters:
 | Parameter | Type | Description | Example |
 |-----------|------|-------------|---------|
 | `testOccupancyOnly` | boolean | Test occupancy filtering without date restrictions | `true` |
+
+## Common Search Scenarios
+
+### 💰 Budget Search (Under $200/night)
+```json
+{
+  "maxPrice": 200,
+  "limit": 25
+}
+```
+
+### 🏠 Family Vacation Home (3-5 bedrooms, 6+ guests)
+```json
+{
+  "minBedrooms": 3,
+  "maxBedrooms": 5,
+  "minGuests": 6,
+  "minBathrooms": 2,
+  "limit": 20
+}
+```
+
+### 💎 Luxury Properties (High-end, 4+ bedrooms)
+```json
+{
+  "minPrice": 500,
+  "minBedrooms": 4,
+  "minBathrooms": 3,
+  "limit": 10
+}
+```
+
+### 🌴 Miami Beach Houses (With Pricing)
+```json
+{
+  "city": "Miami",
+  "available": {
+    "checkIn": "2025-08-01",
+    "checkOut": "2025-08-07"
+  },
+  "guestsCount": 4,
+  "minBedrooms": 2,
+  "minPrice": 200,
+  "maxPrice": 600,
+  "limit": 25
+}
+```
+
+### 💑 Romantic Getaway (Small, cozy properties)
+```json
+{
+  "maxBedrooms": 1,
+  "maxGuests": 2,
+  "minPrice": 80,
+  "maxPrice": 250,
+  "limit": 20
+}
+```
+
+### 👥 Large Group Rental (10+ guests)
+```json
+{
+  "minGuests": 10,
+  "minBedrooms": 5,
+  "minBeds": 8,
+  "limit": 15
+}
+```
 
 ## Response Format
 
@@ -347,6 +548,72 @@ curl -i --location --request POST 'http://127.0.0.1:54321/functions/v1/listing-s
   }'
 ```
 
+### Search With Min/Max Filters
+
+Filter listings by price range, bedrooms, and guest capacity:
+
+```bash
+curl -i --location --request POST 'http://127.0.0.1:54321/functions/v1/listing-search' \
+  --header 'Content-Type: application/json' \
+  --data-raw '{
+    "city": "Miami",
+    "minPrice": 100,
+    "maxPrice": 500,
+    "minBedrooms": 2,
+    "maxBedrooms": 4,
+    "minGuests": 4,
+    "maxGuests": 8,
+    "limit": 25
+  }'
+```
+
+### Price Range Only
+
+```bash
+curl -i --location --request POST 'http://127.0.0.1:54321/functions/v1/listing-search' \
+  --header 'Content-Type: application/json' \
+  --data-raw '{
+    "minPrice": 150,
+    "maxPrice": 300,
+    "limit": 20
+  }'
+```
+
+### Bedrooms and Bathrooms Filter
+
+```bash
+curl -i --location --request POST 'http://127.0.0.1:54321/functions/v1/listing-search' \
+  --header 'Content-Type: application/json' \
+  --data-raw '{
+    "minBedrooms": 3,
+    "minBathrooms": 2,
+    "minBeds": 4,
+    "limit": 15
+  }'
+```
+
+### Combined: Dates + Min/Max Filters + Quotes
+
+Search for available properties with pricing quotes and filter by attributes:
+
+```bash
+curl -i --location --request POST 'http://127.0.0.1:54321/functions/v1/listing-search' \
+  --header 'Content-Type: application/json' \
+  --data-raw '{
+    "available": {
+      "checkIn": "2025-08-01",
+      "checkOut": "2025-08-07"
+    },
+    "guestsCount": 4,
+    "minPrice": 200,
+    "maxPrice": 600,
+    "minBedrooms": 2,
+    "minBathrooms": 2,
+    "minGuests": 4,
+    "limit": 20
+  }'
+```
+
 ### Test Occupancy Only (No Date Restrictions)
 
 ```bash
@@ -381,7 +648,173 @@ curl -i --location --request POST 'http://127.0.0.1:54321/functions/v1/listing-s
 
 ## JavaScript/TypeScript Usage
 
-### Basic Fetch Example
+### Simple Search Function
+
+```typescript
+interface SearchFilters {
+  city?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  minBedrooms?: number;
+  maxBedrooms?: number;
+  minBathrooms?: number;
+  maxBathrooms?: number;
+  minGuests?: number;
+  maxGuests?: number;
+  minBeds?: number;
+  maxBeds?: number;
+  available?: {
+    checkIn: string;
+    checkOut: string;
+    minOccupancy?: number;
+  };
+  guestsCount?: number;
+  limit?: number;
+  skip?: number;
+}
+
+const searchListings = async (filters: SearchFilters) => {
+  const response = await fetch('http://127.0.0.1:54321/functions/v1/listing-search', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(filters)
+  });
+  
+  const result = await response.json();
+  
+  if (result.status === 'success') {
+    return result.data; // Array of listings
+  } else {
+    throw new Error(result.message);
+  }
+};
+
+// Usage Examples
+const examples = async () => {
+  // Basic search
+  const allListings = await searchListings({ limit: 25 });
+  
+  // Price range filter
+  const affordableListings = await searchListings({
+    minPrice: 100,
+    maxPrice: 300,
+    limit: 20
+  });
+  
+  // Property attributes
+  const familyHomes = await searchListings({
+    minBedrooms: 3,
+    maxBedrooms: 5,
+    minGuests: 6,
+    minBathrooms: 2,
+    limit: 15
+  });
+  
+  // With dates (gets pricing quotes)
+  const withPricing = await searchListings({
+    city: "Miami",
+    available: {
+      checkIn: "2025-08-01",
+      checkOut: "2025-08-07"
+    },
+    guestsCount: 4,
+    minPrice: 200,
+    maxPrice: 600,
+    minBedrooms: 2,
+    limit: 20
+  });
+  
+  // Each listing in withPricing will have a 'quote' field with pricing details
+};
+```
+
+### React Hook with Filters
+
+```typescript
+import { useState, useEffect } from 'react';
+
+interface UseListingSearchResult {
+  listings: any[];
+  loading: boolean;
+  error: string | null;
+  totalCount: number;
+  page: number;
+}
+
+const useListingSearch = (filters: SearchFilters): UseListingSearchResult => {
+  const [listings, setListings] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [totalCount, setTotalCount] = useState(0);
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    const searchListings = async () => {
+      setLoading(true);
+      setError(null);
+      
+      try {
+        const response = await fetch('http://127.0.0.1:54321/functions/v1/listing-search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(filters)
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+          setListings(data.data);
+          setTotalCount(data.totalCount);
+          setPage(data.page);
+        } else {
+          setError(data.message);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch listings');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    searchListings();
+  }, [JSON.stringify(filters)]); // Re-fetch when filters change
+
+  return { listings, loading, error, totalCount, page };
+};
+
+// Component Usage
+const ListingSearchComponent = () => {
+  const { listings, loading, error } = useListingSearch({
+    city: "Miami",
+    minPrice: 100,
+    maxPrice: 500,
+    minBedrooms: 2,
+    maxBedrooms: 4,
+    limit: 25
+  });
+
+  if (loading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error}</div>;
+
+  return (
+    <div>
+      {listings.map(listing => (
+        <div key={listing.id}>
+          <h3>{listing.title}</h3>
+          <p>{listing.location}</p>
+          <p>${listing.pricePerNight}/night</p>
+          <p>{listing.bedroom} bd, {listing.bath} ba, sleeps {listing.guests}</p>
+          {listing.quote && (
+            <p>Total: ${listing.quote.hostPayout}</p>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+};
+```
+
+### Basic Fetch Example (Legacy)
 
 ```javascript
 const searchListings = async (params = {}) => {
@@ -412,9 +845,35 @@ const resultsWithQuotes = await searchListings({
   guestsCount: 2,
   limit: 10
 });
+
+// Usage - With min/max filters
+const filteredResults = await searchListings({
+  minPrice: 100,
+  maxPrice: 500,
+  minBedrooms: 2,
+  maxBedrooms: 4,
+  minGuests: 4,
+  maxGuests: 8,
+  limit: 20
+});
+
+// Usage - Combined filters with quotes
+const advancedResults = await searchListings({
+  city: "Miami",
+  available: {
+    checkIn: "2025-08-01",
+    checkOut: "2025-08-07"
+  },
+  guestsCount: 4,
+  minPrice: 200,
+  maxPrice: 600,
+  minBedrooms: 2,
+  minBathrooms: 2,
+  limit: 15
+});
 ```
 
-### React Hook Example
+### React Hook Example (Legacy)
 
 ```javascript
 import { useState, useEffect } from 'react';
@@ -461,6 +920,25 @@ const useListingSearch = (searchParams) => {
 
 ## Important Notes
 
+### Filter Behavior Summary
+
+| Filter Type | How It Works | Example |
+|-------------|--------------|---------|
+| **Min/Max Filters** | Applied client-side after fetching from Guesty | `minPrice: 100, maxPrice: 500` |
+| **Price Filters** | Based on `pricePerNight` (base nightly rate) | Excludes cleaning fees/taxes |
+| **Range Filters** | Can use min only, max only, or both | `minBedrooms: 2` or `maxBedrooms: 4` or both |
+| **Guest Filters** | Filters by maximum guest capacity | `minGuests: 4` = sleeps 4+ people |
+| **Validation** | Non-negative numbers only; invalid values ignored | `-100` ignored, `200` accepted |
+| **Combination** | Mix any filters freely | Price + bedrooms + guests + dates |
+
+**Key Points:**
+- ✅ All min/max filters are **optional**
+- ✅ Filters work **with or without dates**
+- ✅ Use **both min and max** for a range, or **just one** for a threshold
+- ✅ When dates are provided, **quotes are automatically fetched**
+- ⚠️ Filters are applied **after** Guesty API call (client-side filtering)
+- ⚠️ Invalid values (negative, non-numeric) are **silently ignored**
+
 ### Quote/Pricing Integration
 
 - **Automatic Quote Fetching**: When you provide `available.checkIn` and `available.checkOut`, the function automatically fetches detailed pricing quotes from Guesty
@@ -484,6 +962,15 @@ const useListingSearch = (searchParams) => {
 - `minOccupancy` filters for listings that can accommodate **at least** the specified number of guests
 - For example, `minOccupancy: 2` will return listings for 2, 3, 4+ guests but not 1-guest listings
 - Client-side filtering is applied after the API call to ensure accurate guest capacity matching
+
+### Min/Max Range Filters
+
+- **Client-Side Filtering**: All min/max filters (`minPrice`, `maxPrice`, `minBedrooms`, `maxBedrooms`, `minBathrooms`, `maxBathrooms`, `minGuests`, `maxGuests`, `minBeds`, `maxBeds`) are applied **after** fetching data from Guesty
+- **Flexible Combinations**: You can use any combination of filters - use just `min`, just `max`, or both for a range
+- **Validation**: All filter values must be non-negative numbers; invalid values are ignored
+- **Price Filtering**: `minPrice` and `maxPrice` filter based on the `pricePerNight` field (base nightly rate)
+- **Example**: `minBedrooms: 2, maxBedrooms: 4` returns only 2, 3, or 4-bedroom properties
+- **Logging**: Each filter logs how many listings remain after being applied (visible in function logs)
 
 ### Performance Considerations
 
@@ -659,3 +1146,158 @@ curl -i --location --request POST 'https://YOUR_PROJECT.supabase.co/functions/v1
   }]
 }
 ```
+
+---
+
+## Quick Reference Card
+
+### All Available Filters
+
+```typescript
+interface ListingSearchRequest {
+  // Price Filters
+  minPrice?: number;           // Minimum nightly rate
+  maxPrice?: number;           // Maximum nightly rate
+  
+  // Property Attributes
+  minBedrooms?: number;        // Minimum bedrooms
+  maxBedrooms?: number;        // Maximum bedrooms
+  minBathrooms?: number;       // Minimum bathrooms
+  maxBathrooms?: number;       // Maximum bathrooms
+  minGuests?: number;          // Minimum guest capacity
+  maxGuests?: number;          // Maximum guest capacity
+  minBeds?: number;            // Minimum beds
+  maxBeds?: number;            // Maximum beds
+  
+  // Location & Search
+  city?: string;               // City name
+  q?: string;                  // Search query
+  tags?: string;               // Tags filter
+  
+  // Availability & Dates (triggers quote fetching)
+  available?: {
+    checkIn: string;           // YYYY-MM-DD
+    checkOut: string;          // YYYY-MM-DD
+    minOccupancy?: number;     // Min guest requirement
+  };
+  guestsCount?: number;        // Number of guests for pricing
+  ignoreFlexibleBlocks?: boolean;
+  
+  // Pagination
+  limit?: number;              // Default: 25, Max: 100
+  skip?: number;               // Default: 0
+  
+  // Advanced
+  ids?: string;                // Comma-separated IDs
+  nids?: string;               // Exclude IDs
+  viewId?: string;             // Saved view ID
+  fields?: string;             // Space-separated fields
+  sort?: string;               // Sort field
+  active?: boolean;
+  listed?: boolean;
+  pmsActive?: boolean;
+  testOccupancyOnly?: boolean;
+  guesty_user_id?: string;     // For favorites
+}
+```
+
+### Response Structure
+
+```typescript
+interface ListingSearchResponse {
+  status: "success" | "error";
+  message: string;
+  data: Listing[];
+  totalCount: number;
+  page: number;
+  limit: number;
+}
+
+interface Listing {
+  id: string;
+  title: string;
+  location: string;
+  area: string;
+  rating: number;              // From review system
+  reviews: number;             // From review system
+  bedroom: number;
+  beds: number;
+  bath: number;
+  guests: number;
+  dateRange: string;
+  pricePerNight: number;       // Base nightly rate
+  totalPrice: number;
+  images: string[];
+  isFavorite: boolean;
+  amenities: string[];
+  quote?: Quote;               // Only when dates provided
+}
+
+interface Quote {
+  _id: string;
+  unitTypeId: string;
+  checkIn: string;
+  checkOut: string;
+  invoiceItems: InvoiceItem[];
+  hostPayout: number;
+  guestsCount: number;
+  numberOfGuests: {
+    numberOfAdults: number;
+    numberOfChildren: number;
+    numberOfInfants: number;
+    numberOfPets: number;
+  };
+}
+
+interface InvoiceItem {
+  title: string;
+  amount: number;
+  currency: string;
+  type: string;                // BASE_RENT, CLEANING_FEE, SERVICE_FEE, etc.
+}
+```
+
+### Filter Examples Cheat Sheet
+
+| Use Case | Filters to Use |
+|----------|----------------|
+| **Budget Search** | `maxPrice: 200` |
+| **Luxury Properties** | `minPrice: 500, minBedrooms: 4` |
+| **Family Home** | `minBedrooms: 3, minGuests: 6, minBathrooms: 2` |
+| **Large Group** | `minGuests: 10, minBeds: 8` |
+| **Solo/Couple** | `maxBedrooms: 1, maxGuests: 2` |
+| **Price Range** | `minPrice: 100, maxPrice: 300` |
+| **Mid-Size** | `minBedrooms: 2, maxBedrooms: 3` |
+| **With Dates** | `available: { checkIn, checkOut }, guestsCount` |
+| **City Search** | `city: "Miami"` |
+| **Combined** | Any combination of above |
+
+### Common Curl Commands
+
+```bash
+# All listings
+curl -X POST 'localhost:54321/functions/v1/listing-search' -H 'Content-Type: application/json' -d '{}'
+
+# Price filter
+curl -X POST 'localhost:54321/functions/v1/listing-search' -H 'Content-Type: application/json' \
+  -d '{"minPrice":100,"maxPrice":500}'
+
+# Property filter
+curl -X POST 'localhost:54321/functions/v1/listing-search' -H 'Content-Type: application/json' \
+  -d '{"minBedrooms":2,"maxBedrooms":4,"minGuests":4}'
+
+# With dates (quotes)
+curl -X POST 'localhost:54321/functions/v1/listing-search' -H 'Content-Type: application/json' \
+  -d '{"available":{"checkIn":"2025-08-01","checkOut":"2025-08-07"},"guestsCount":4,"minPrice":200}'
+```
+
+### Remember
+
+- ✅ All min/max filters are **optional** and can be combined freely
+- ✅ Add dates (`available.checkIn` + `available.checkOut`) to get **pricing quotes**
+- ✅ Filters work **independently** - use what you need
+- ✅ Use `limit` and `skip` for **pagination**
+- ⚠️ Min/max filters apply **after** Guesty fetch (client-side)
+- ⚠️ Price filters use **base nightly rate** (excludes fees/taxes)
+- ⚠️ Invalid values are **silently ignored**
+
